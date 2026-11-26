@@ -17,3 +17,5 @@ La prueba construye el paquete, inspecciona el tarball e instala ese archivo en 
 [Ancla del proyecto](ANCHOR.yaml) · [Glosario](GLOSSARY.md) · [Seguridad](SECURITY.md)
 
 `pyproject.toml` sólo configura Ruff para scripts Python opcionales; no añade un runtime ni dependencias al paquete. El lockfile del proyecto es `pnpm-lock.yaml`.
+
+[Verificador de premerge](docs/premerge.md)
