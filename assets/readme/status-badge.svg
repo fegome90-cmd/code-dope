@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 100" width="1200" height="100" role="img" aria-labelledby="status-title status-desc">
+  <title id="status-title">code-dope Live Repository Telemetry</title>
+  <desc id="status-desc">Auto-synced status strip showing main branch state, module counts, pattern and benchmark status, and latest HEAD commit.</desc>
+
+  <rect x="0" y="0" width="1200" height="100" rx="16" fill="#0D1117" stroke="#30363D" stroke-width="1.5"/>
+
+  <!-- Column Dividers -->
+  <g stroke="#30363D" stroke-width="1">
+    <line x1="316" y1="20" x2="316" y2="80"/>
+    <line x1="608" y1="20" x2="608" y2="80"/>
+    <line x1="900" y1="20" x2="900" y2="80"/>
+  </g>
+
+  <!-- AUTO:SVG_STATUS:START -->
+  <g id="auto-status" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+    <text x="48" y="38" fill="#8B949E" font-size="16" font-weight="600" letter-spacing="0.5">MAIN STATE</text>
+    <text x="48" y="70" fill="#3FB950" font-size="22" font-weight="600">v0.0.0</text>
+
+    <text x="340" y="38" fill="#8B949E" font-size="16" font-weight="600" letter-spacing="0.5">CODE MODULES</text>
+    <text x="340" y="70" fill="#F0F6FC" font-size="22" font-weight="600">1 src · 0 tests</text>
+
+    <text x="632" y="38" fill="#8B949E" font-size="16" font-weight="600" letter-spacing="0.5">PATTERNS / BENCH</text>
+    <text x="632" y="70" fill="#F0F6FC" font-size="22" font-weight="600">Pending PR #2</text>
+
+    <text x="924" y="38" fill="#8B949E" font-size="16" font-weight="600" letter-spacing="0.5">HEAD SYNC</text>
+    <text x="924" y="70" fill="#3FB950" font-size="22" font-weight="600" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace">7d2c8d1 · 2026-11-26</text>
+  </g>
+  <!-- AUTO:SVG_STATUS:END -->
+</svg>

@@ -1,0 +1,49 @@
+name: Update README
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-readme:
+    if: github.actor != 'github-actions[bot]' && (github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[skip ci]'))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve Node.js version
+        id: node_ver
+        run: |
+          if [ -f .node-version ]; then
+            echo "version=$(tr -d '[:space:]' < .node-version)" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=22" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.node_ver.outputs.version }}
+
+      - name: Sync README and status SVG
+        run: node scripts/update-readme.mjs
+
+      - name: Commit and push changes if any
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add README.md
+            if [ -d assets/readme ]; then
+              git add assets/readme/
+            fi
+            git commit -m "docs(readme): sync README metrics and modules [skip ci]"
+            git push
+          else
+            echo "README and managed SVGs are already up to date."
+          fi
