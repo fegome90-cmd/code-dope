@@ -45,7 +45,8 @@ Reutilizar primero y escribir solo lo que falta. Este es el único código nuevo
 3. **Fail-closed por defecto.** Una herramienta sin clasificar se deniega, y una escritura sin hook `approve` también.
 4. **Puente solo de strings JSON.** Ningún handle de objeto del host entra al guest: no existe una cadena `constructor` que lleve al realm del host.
 5. **Worker thread por ejecución (por defecto).** La revisión independiente mostró que, en modo inline, un bucle de CPU congela el event loop y un desbordamiento de stack podía dejar inservible el módulo WASM. El worker resuelve ambas cosas a cambio de unos 100 ms por ejecución. El modo inline sigue disponible y recicla el módulo cuando detecta un fallo de limpieza.
-6. **Sin replay ni aprobación durable.** El motor de Cloudflare depende de Durable Objects. La aprobación aquí es síncrona por llamada y recibe los argumentos reales.
+6. **Pool de workers opt-in (Fase 2).** `PooledWorkerExecutor` reutiliza el worker y su módulo WASM cargado, nunca el estado del guest: cada ejecución crea runtime y contexto QuickJS nuevos. Reciclaje conservador: cualquier ejecución con error (incluido un `throw` normal), timeout, crash o salida descarta el worker; también al llegar a `maxUses` éxitos (default 100) y tras `idleMs` ocioso (default 30 s). Los mensajes llevan `job` id y el worker descarta las respuestas de llamadas abandonadas de jobs anteriores. El timeout duro cubre el arranque del worker. No es el default porque deja hilos vivos y agrega `close()` al ciclo de vida. Sin `stderr: true` (ese stream retiene el proceso aun con `unref`): el worker del pool silencia su propio stderr. Medido: ~4,7 ms p50 en caliente contra ~94 ms del efímero.
+7. **Sin replay ni aprobación durable.** El motor de Cloudflare depende de Durable Objects. La aprobación aquí es síncrona por llamada y recibe los argumentos reales.
 
 ## Portabilidad
 

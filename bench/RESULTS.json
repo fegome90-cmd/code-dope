@@ -1,6 +1,6 @@
 {
   "workflow": "pending orders of gold-tier customers -> ids, totals, sum (synthetic data, in-memory MCP)",
-  "date": "2026-11-26T10:33:36.061Z",
+  "date": "2026-11-26T11:01:29.619Z",
   "node": "v22.23.5",
   "runs": 20,
   "measured": {
@@ -18,22 +18,33 @@
     },
     "candidateCodeChars_modelOutput": 721,
     "toolWallClockMsMedian": {
-      "baseline": 0.4,
-      "candidateWorker": 101.14,
-      "candidateInline": 5.04,
+      "baseline": 0.47,
+      "candidateWorker": 94.03,
+      "candidatePoolWarm": 4.7,
+      "candidateInline": 4.09,
       "p10p90": {
         "baseline": [
-          0.3,
-          0.68
+          0.36,
+          0.71
         ],
         "candidateWorker": [
-          87.09,
-          117.86
+          81.56,
+          101.17
+        ],
+        "candidatePoolWarm": [
+          4.28,
+          6.24
         ],
         "candidateInline": [
-          3.25,
-          10.2
+          3.41,
+          5.48
         ]
+      },
+      "p95": {
+        "baseline": 0.82,
+        "candidateWorker": 124.61,
+        "candidatePoolWarm": 6.82,
+        "candidateInline": 5.64
       }
     },
     "correct": {

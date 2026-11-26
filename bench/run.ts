@@ -16,7 +16,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createCodeModeMcpServer } from "../src/mcp.ts";
-import type { Isolation } from "../src/index.ts";
+import { createDefaultExecutor, type Executor, type Isolation } from "../src/index.ts";
 import { ordersServer, ORDERS, CUSTOMERS, type Counters } from "../tests/fixtures/servers.ts";
 
 type R = { content: Array<{ text: string }>; isError?: boolean };
@@ -81,9 +81,9 @@ const CANDIDATE_CODE = `async () => {
   return { orders, sum: orders.reduce((a, o) => a + o.total, 0), failedCustomers: failed, complete: failed.length === 0 };
 }`;
 
-async function candidate(failCustomer?: string, isolation: Isolation = "worker") {
+async function candidate(failCustomer?: string, isolation: Isolation = "worker", executor?: Executor) {
   const counters: Counters = { calls: {}, writes: [] };
-  const client = await connect(await createCodeModeMcpServer({ upstream: ordersServer(counters, { failCustomer }).server, policy: { read: ["list_orders", "get_customer"] }, isolation }));
+  const client = await connect(await createCodeModeMcpServer({ upstream: ordersServer(counters, { failCustomer }).server, policy: { read: ["list_orders", "get_customer"] }, isolation, executor }));
   const defsChars = JSON.stringify((await client.listTools()).tools).length;
   const t0 = performance.now();
   const r = await client.callTool({ name: "code", arguments: { code: CANDIDATE_CODE } });
@@ -106,15 +106,20 @@ async function median<T extends { ms: number }>(f: () => Promise<T>) {
   for (let i = 0; i < runs; i++) xs.push(await f());
   xs.sort((a, b) => a.ms - b.ms);
   const q = (p: number) => xs[Math.round(p * (runs - 1))].ms;
-  return { ...xs[Math.floor(runs / 2)], msP10: q(0.1), msP90: q(0.9) };
+  return { ...xs[Math.floor(runs / 2)], msP10: q(0.1), msP90: q(0.9), msP95: q(0.95) };
 }
 
 const b = await median(() => baseline());
 const c = await median(() => candidate());
 const ci = await median(() => candidate(undefined, "inline"));
+// One shared, pre-warmed pool: measures warm executions (the pool's steady state), not start-up.
+const pool = createDefaultExecutor("pool", { size: 2 });
+await candidate(undefined, "pool", pool); // warm-up
+const cp = await median(() => candidate(undefined, "pool", pool));
+await pool.close();
 const sumB = b.resultsToModel.reduce((a, x) => a + x, 0);
 const correctB = JSON.stringify(b.picked) === JSON.stringify(truth);
-const correctC = JSON.stringify(c.out.orders) === JSON.stringify(truth) && c.out.sum === truthSum && JSON.stringify(ci.out) === JSON.stringify(c.out);
+const correctC = JSON.stringify(c.out.orders) === JSON.stringify(truth) && c.out.sum === truthSum && JSON.stringify(ci.out) === JSON.stringify(c.out) && JSON.stringify(cp.out) === JSON.stringify(c.out);
 
 const bf = await baseline("c-1");
 const cf = await candidate("c-1");
@@ -130,8 +135,9 @@ const report = {
     toolDefinitionChars: { baseline: b.defsChars, candidate: c.defsChars },
     candidateCodeChars_modelOutput: c.codeChars,
     toolWallClockMsMedian: {
-      baseline: +b.ms.toFixed(2), candidateWorker: +c.ms.toFixed(2), candidateInline: +ci.ms.toFixed(2),
-      p10p90: { baseline: [+b.msP10.toFixed(2), +b.msP90.toFixed(2)], candidateWorker: [+c.msP10.toFixed(2), +c.msP90.toFixed(2)], candidateInline: [+ci.msP10.toFixed(2), +ci.msP90.toFixed(2)] },
+      baseline: +b.ms.toFixed(2), candidateWorker: +c.ms.toFixed(2), candidatePoolWarm: +cp.ms.toFixed(2), candidateInline: +ci.ms.toFixed(2),
+      p10p90: { baseline: [+b.msP10.toFixed(2), +b.msP90.toFixed(2)], candidateWorker: [+c.msP10.toFixed(2), +c.msP90.toFixed(2)], candidatePoolWarm: [+cp.msP10.toFixed(2), +cp.msP90.toFixed(2)], candidateInline: [+ci.msP10.toFixed(2), +ci.msP90.toFixed(2)] },
+      p95: { baseline: +b.msP95.toFixed(2), candidateWorker: +c.msP95.toFixed(2), candidatePoolWarm: +cp.msP95.toFixed(2), candidateInline: +ci.msP95.toFixed(2) },
     },
     correct: { baseline: correctB, candidate: correctC },
     onFailure_customer_c1_unavailable: {

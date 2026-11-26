@@ -11,7 +11,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { codeMcpServer } from "@cloudflare/codemode/mcp";
 import type { Executor } from "@cloudflare/codemode";
 import { createDefaultExecutor, type Isolation } from "./executor/default.ts";
-import type { WorkerExecutorOptions } from "./executor/worker-executor.ts";
+import type { PooledWorkerExecutorOptions } from "./executor/pool-executor.ts";
 import { withPolicy, type ToolPolicy } from "./policy.ts";
 import { HELPERS_DOC } from "./helpers.ts";
 
@@ -34,7 +34,7 @@ export interface CodeModeMcpOptions {
   policy: ToolPolicy;
   /** Inner executor. Default: createDefaultExecutor(isolation, executorOptions) with helpers preloaded. */
   executor?: Executor;
-  executorOptions?: WorkerExecutorOptions;
+  executorOptions?: PooledWorkerExecutorOptions;
   /** Default "worker". */
   isolation?: Isolation;
   description?: string;

@@ -4,7 +4,7 @@
  */
 import type { ExecuteResult, ResolvedProvider } from "@cloudflare/codemode";
 import { createDefaultExecutor, type Isolation } from "./executor/default.ts";
-import type { WorkerExecutorOptions } from "./executor/worker-executor.ts";
+import type { PooledWorkerExecutorOptions } from "./executor/pool-executor.ts";
 import { createAuditLog, withPolicy, type AuditRecord, type ToolPolicy } from "./policy.ts";
 
 type Fn = (args: unknown) => Promise<unknown> | unknown;
@@ -13,7 +13,7 @@ export interface CodeRunnerOptions {
   /** Tool functions by namespace, e.g. { crm: { getCustomer }, mail: { send } }. */
   tools: Record<string, Record<string, Fn>>;
   policy: ToolPolicy;
-  executor?: WorkerExecutorOptions;
+  executor?: PooledWorkerExecutorOptions;
   /** Default "worker". */
   isolation?: Isolation;
 }

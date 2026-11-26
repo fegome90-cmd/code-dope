@@ -1,5 +1,6 @@
 export { QuickJSExecutor, type QuickJSExecutorOptions } from "./executor/quickjs-executor.ts";
 export { WorkerExecutor, type WorkerExecutorOptions } from "./executor/worker-executor.ts";
+export { PooledWorkerExecutor, type PooledWorkerExecutorOptions, type PoolStats } from "./executor/pool-executor.ts";
 export { createDefaultExecutor, type Isolation } from "./executor/default.ts";
 export {
   withPolicy,

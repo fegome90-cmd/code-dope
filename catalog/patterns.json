@@ -87,9 +87,10 @@
       "tasks": [
         "sandbox model-generated JavaScript in Node",
         "Executor for @cloudflare/codemode outside Workers",
-        "don't block the host event loop"
+        "don't block the host event loop",
+        "reuse warm sandbox workers to cut per-execution latency"
       ],
-      "source": "src/executor/worker-executor.ts#WorkerExecutor (default), src/executor/quickjs-executor.ts#QuickJSExecutor (inline), src/executor/default.ts#createDefaultExecutor",
+      "source": "src/executor/worker-executor.ts#WorkerExecutor (default), src/executor/pool-executor.ts#PooledWorkerExecutor (isolation: \"pool\"), src/executor/quickjs-executor.ts#QuickJSExecutor (inline), src/executor/default.ts#createDefaultExecutor",
       "deps": [
         "quickjs-emscripten 0.32.0 (MIT)"
       ],
@@ -97,7 +98,7 @@
         "node>=22.18"
       ],
       "permissions": "guest has no fs/net/process/timers; only JSON tool bridge; worker env is empty",
-      "test": "tests/executor.test.ts, tests/review-regressions.test.ts",
+      "test": "tests/executor.test.ts, tests/review-regressions.test.ts, tests/pool.test.ts, tests/pool-contract.test.ts",
       "provenance": "own code implementing Cloudflare Executor contract (executor-types.ts @841b6fc)"
     },
     {

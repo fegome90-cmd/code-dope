@@ -16,7 +16,7 @@ import type { Executor } from "@cloudflare/codemode";
 import { generateTypesFromJsonSchema } from "./vendor/cf-json-schema-types.ts";
 import { sanitizeToolName } from "./vendor/cf-utils.ts";
 import { createDefaultExecutor, type Isolation } from "./executor/default.ts";
-import type { WorkerExecutorOptions } from "./executor/worker-executor.ts";
+import type { PooledWorkerExecutorOptions } from "./executor/pool-executor.ts";
 import { withPolicy, type ToolPolicy } from "./policy.ts";
 import { HELPERS_DOC } from "./helpers.ts";
 
@@ -83,7 +83,7 @@ export interface SearchExecuteOptions {
   upstream: McpServer;
   policy: ToolPolicy;
   executor?: Executor;
-  executorOptions?: WorkerExecutorOptions;
+  executorOptions?: PooledWorkerExecutorOptions;
   /** Default "worker". */
   isolation?: Isolation;
   /** Max characters returned to the model from `execute`. Default 24_000 (~6k tokens), like Cloudflare. */
