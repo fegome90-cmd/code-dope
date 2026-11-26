@@ -172,10 +172,44 @@ Fuera del alcance de esta fase, salvo que lo autorices. Para diseñarla conviene
 
 ---
 
-## Decisiones pendientes
+## Decisiones pendientes (investigadas el 2026-11-26)
 
-- **D1 (M3).** ¿Build solo para distribución, con `dist/` generado por `prepare` y no commiteado? **Recomendado.** La otra opción es commitear `dist/`.
-- **D2 (M2).** Con colisión, ¿allowlists exactas y `deny` sanitizado? **Recomendado.** La otra opción es denegar siempre las herramientas que colisionan.
+### D1: cómo distribuir el build
+
+Se probó un prototipo en un clon temporal: `tsc` con `rewriteRelativeImportExtensions` y `WORKER_ENTRY` condicionado a la extensión. Consumidor instalando desde `git+file://` [R]:
+
+| Opción | npm 10.9.9 | npm `--ignore-scripts` | pnpm 10.28 (default) |
+|---|---|---|---|
+| A: `prepare` construye `dist/` (no commiteado) | OK (8 s, sin devDeps en el consumidor) | OK (npm ejecutó `prepare` igual) | **FALLA**: `ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED`; el consumidor debe ponerlo en su allowlist |
+| B: `dist/` commiteado, sin `prepare` | OK | OK | OK |
+
+En los casos OK funcionaron el worker y el pool desde `dist/`.
+
+Documentación, según Haiku: Bun no ejecuta scripts de dependencias que no estén en `trustedDependencies`, y Yarn Berry usa `prepack` en vez de `prepare` para dependencias git [O doc, no probado]. Node rechaza a propósito el type stripping en `node_modules` y recomienda publicar JS [O doc].
+
+**Recomendación: B**, con una verificación de deriva en `test:all` (`npm run build && git diff --exit-code dist/`) para que `dist/` no quede desfasado de `src/`. Funciona con cualquier gestor sin configuración del consumidor. El costo son diffs duplicados en cada cambio.
+
+Variante B′: `dist/` solo en tags de release, generado por un script, con los consumidores fijados a `#vX.Y.Z`. Deja `main` limpio, pero exige disciplina de release. Se puede adoptar más adelante.
+
+### D2: colisión de nombres por puntuación
+
+Evidencia:
+- La especificación MCP dice que los nombres son case-sensitive y SHOULD ser únicos por servidor, y no define una forma sanitizada; la colisión la crea el cliente [O doc].
+- `DynamicWorkerExecutor` de Cloudflare **rechaza la ejecución completa** si dos nombres colapsan (`index.js:372-390`) [O, Haiku].
+- `generateTypes` de Cloudflare no detecta la colisión y emitiría declaraciones duplicadas [I].
+- Nuestro `QuickJSExecutor` ya prioriza el nombre exacto y descarta los alias ambiguos [O].
+
+| Opción | Seguridad | Utilidad | Coherencia |
+|---|---|---|---|
+| A: allowlists exactas cuando hay colisión; `deny` sanitizado | fail-closed: la variante no escrita queda sin clasificar | las dos herramientas siguen disponibles si se nombran exactamente | igual que el executor (exacto primero) |
+| B: denegar u ocultar las que colisionan | máxima | pierde ambas herramientas | simple |
+| C: rechazar la ejecución completa (como Cloudflare) | máxima, y ruidosa | inutiliza al proveedor entero | idéntica al upstream |
+
+**Recomendación: A**, con dos agregados:
+1. La razón de denegación menciona la colisión ("`delete-user` collides with `delete_user`; name it exactly"), para que se entienda el `not classified`.
+2. `createCodeModeMcpServer` y el servidor search/execute omiten de los tipos anunciados las variantes no permitidas, para que el modelo no vea declaraciones duplicadas.
+
+B y C protegen igual, pero castigan un caso legítimo, y C inutiliza todo el proveedor.
 
 ## Orden de ejecución
 
