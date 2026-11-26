@@ -5,17 +5,30 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: update-readme-main
+  cancel-in-progress: false
+
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   update-readme:
-    if: github.actor != 'github-actions[bot]' && (github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[skip ci]'))
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.actor != 'github-actions[bot]' &&
+        !contains(github.event.head_commit.message, '[skip ci]') &&
+        !contains(github.event.head_commit.message, 'docs/sync-readme') &&
+        !contains(github.event.head_commit.message, 'docs(readme): sync README') &&
+        !contains(github.event.head_commit.message, 'Auto-Sync: readme')
+      )
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Resolve Node.js version
         id: node_ver
@@ -23,7 +36,7 @@ jobs:
           if [ -f .node-version ]; then
             echo "version=$(tr -d '[:space:]' < .node-version)" >> "$GITHUB_OUTPUT"
           else
-            echo "version=22" >> "$GITHUB_OUTPUT"
+            echo "version=24" >> "$GITHUB_OUTPUT"
           fi
 
       - uses: actions/setup-node@v4
@@ -33,17 +46,38 @@ jobs:
       - name: Sync README and status SVG
         run: node scripts/update-readme.mjs
 
-      - name: Commit and push changes if any
+      - name: Open or update sync PR if managed files changed
+        env:
+          GH_TOKEN: ${{ secrets.README_SYNC_TOKEN }}
         run: |
-          if [ -n "$(git status --porcelain)" ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add README.md
-            if [ -d assets/readme ]; then
-              git add assets/readme/
-            fi
-            git commit -m "docs(readme): sync README metrics and modules [skip ci]"
-            git push
-          else
+          if git diff --quiet -- README.md assets/readme/status-badge.svg; then
             echo "README and managed SVGs are already up to date."
+            exit 0
+          fi
+
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "::error::README_SYNC_TOKEN secret is not configured. Add a fine-grained PAT or GitHub App token with Contents (Read and write) and Pull requests (Read and write) so the sync PR can be opened and trigger Bootstrap CI checks."
+            exit 1
+          fi
+
+          git checkout -B docs/sync-readme
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md assets/readme/status-badge.svg
+          git commit -m "docs(readme): sync README metrics and modules" -m "Auto-Sync: readme"
+          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/docs/sync-readme
+
+          PR_NUM=$(gh pr list --head docs/sync-readme --base main --state open --json number --jq '.[0].number // empty')
+          if [ -z "${PR_NUM}" ]; then
+            gh pr create \
+              --base main \
+              --head docs/sync-readme \
+              --title "docs(readme): sync README metrics and modules" \
+              --body-file - <<'EOF'
+          Automated README and telemetry SVG sync for recent merges to `main`.
+
+          Auto-Sync: readme
+          EOF
+          else
+            echo "Updated existing sync PR #${PR_NUM}."
           fi
