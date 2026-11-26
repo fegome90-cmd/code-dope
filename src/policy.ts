@@ -27,6 +27,8 @@ export interface ApprovalRequest {
   provider: string;
   tool: string;
   args: unknown;
+  /** Aborted when the enclosing execution ends; always supplied by withPolicy. */
+  signal?: AbortSignal;
 }
 
 export interface AuditRecord {
@@ -40,6 +42,8 @@ export interface AuditRecord {
   error?: string;
   /** "unknown" when the call timed out: the tool may still have completed its side effect. */
   outcome?: "done" | "failed" | "unknown";
+  /** The call was already in flight and settled after its execution ended. */
+  afterExecutionEnd?: boolean;
   durationMs: number;
   argsChars: number;
   resultChars?: number;
@@ -129,8 +133,10 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string, onTimeout: () 
   ]).finally(() => clearTimeout(t));
 }
 
-/** Wrap one provider's fns with the policy. `state` is shared across providers of one execution. */
-export function guardFns(provider: string, fns: Fns, policy: ToolPolicy, state = { calls: 0, seq: 0 }): Fns {
+type ExecutionState = { calls: number; seq: number; closed?: boolean; abort?: AbortController };
+
+/** Wrap one provider's fns. Without a shared execution state, the guards never close. */
+export function guardFns(provider: string, fns: Fns, policy: ToolPolicy, state: ExecutionState = { calls: 0, seq: 0, closed: false, abort: new AbortController() }): Fns {
   const maxCalls = policy.maxCalls ?? 50;
   const callTimeoutMs = policy.callTimeoutMs ?? 15_000;
   const maxResultChars = policy.maxResultChars ?? 1_000_000;
@@ -146,6 +152,7 @@ export function guardFns(provider: string, fns: Fns, policy: ToolPolicy, state =
         throw new PolicyError(`Denied ${provider}.${tool}: ${reason}`);
       };
 
+      if (state.closed) deny("execution already finished");
       if (matches(policy.deny, provider, tool)) deny("tool is on the deny list");
       if (kind === "unclassified") deny("tool is not classified as read or write (fail-closed)");
       // Reserve the budget slot synchronously, before any await, so concurrent
@@ -187,7 +194,7 @@ export function guardFns(provider: string, fns: Fns, policy: ToolPolicy, state =
         }
         let ok = false;
         try {
-          ok = (await policy.approve!({ provider, tool, args: snapshot })) === true;
+          ok = (await policy.approve!({ provider, tool, args: snapshot, signal: state.abort?.signal })) === true;
         } catch (e) {
           release();
           deny(`approval hook failed: ${e instanceof Error ? e.message : String(e)}`);
@@ -198,6 +205,10 @@ export function guardFns(provider: string, fns: Fns, policy: ToolPolicy, state =
         }
       }
 
+      if (state.closed) {
+        release();
+        deny("execution already finished");
+      }
       let timedOut = false;
       try {
         const result = await withTimeout(Promise.resolve(fn(args)), callTimeoutMs, `${provider}.${tool}`, () => {
@@ -207,12 +218,13 @@ export function guardFns(provider: string, fns: Fns, policy: ToolPolicy, state =
         if (resultChars > maxResultChars) {
           throw new PolicyError(`Result of ${provider}.${tool} is ${resultChars} chars (limit ${maxResultChars}); filter or paginate`);
         }
-        policy.audit?.({ ...base, decision: "allowed", ok: true, outcome: "done", durationMs: Date.now() - started, resultChars });
+        policy.audit?.({ ...base, decision: "allowed", ok: true, outcome: "done", durationMs: Date.now() - started, resultChars, ...(state.closed ? { afterExecutionEnd: true } : {}) });
         return result;
       } catch (e) {
         policy.audit?.({
           ...base, decision: "allowed", ok: false, outcome: timedOut ? "unknown" : "failed",
           error: e instanceof Error ? e.message : String(e), durationMs: Date.now() - started,
+          ...(state.closed ? { afterExecutionEnd: true } : {}),
         });
         throw e;
       }
@@ -230,11 +242,16 @@ export function withPolicy(inner: Executor, policy: ToolPolicy): Executor {
       if (options?.connectors?.length) {
         return { result: undefined, error: "withPolicy: connector bindings bypass the policy layer and are not allowed", logs: [] };
       }
-      const state = { calls: 0, seq: 0 };
+      const state = { calls: 0, seq: 0, closed: false, abort: new AbortController() };
       const guarded: ResolvedProvider[] | Fns = Array.isArray(providersOrFns)
         ? providersOrFns.map((p) => ({ ...p, fns: guardFns(p.name, p.fns, policy, state) }))
         : guardFns("codemode", providersOrFns, policy, state);
-      return inner.execute(code, guarded, options);
+      try {
+        return await inner.execute(code, guarded, options);
+      } finally {
+        state.closed = true;
+        state.abort.abort();
+      }
     },
   };
 }
