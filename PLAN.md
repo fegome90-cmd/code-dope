@@ -1,0 +1,182 @@
+# PLAN — Fase 3: bloqueos de la revisión del 2026-11-26
+
+Origen: revisión con 4 subagentes (3 Haiku verificando referencias externas, 1 Sonnet contrastando RESEARCH.md con el código). Los hallazgos técnicos T1–T3 fueron reproducidos de nuevo por Opus.
+Estado: **PROPUESTO**, pendiente de confirmación y de las decisiones D1 y D2. No se ha ejecutado nada.
+
+Reglas comunes a todas las mejoras:
+- Cada una cierra con `npm run test:all` en verde y un commit propio en `claude/lucid-gates-g2l07h`.
+- No se debilitan `tests/review-regressions.test.ts`, `tests/executor.test.ts` ni `tests/pool-contract.test.ts`.
+- Las pruebas de regresión de seguridad (M1, M2) las escribe Sonnet desde la especificación de esta página, sin ver el arreglo. Las de implementación las escribe Opus.
+
+| ID | Mejora | Tipo | Prioridad | Depende de | Decisión |
+|---|---|---|---|---|---|
+| M1 | Cortar escrituras después del fin de la ejecución | técnico / seguridad | 1 | — | — |
+| M2 | Colisión de nombres por puntuación | técnico / seguridad | 1 | — | D2 |
+| M3 | Instalable como dependencia (build de distribución) | técnico / bloqueante | 1 | — | D1 |
+| M4 | Reemplazo precalentado en el pool | rendimiento | 2 | — | — |
+| M5 | Respaldar afirmaciones [R] sin prueba | verificación | 2 | — | — |
+| M6 | Bench de carga sostenida del pool | verificación | 2 | M4 | — |
+| M7 | Actualizar RESEARCH / ARCHITECTURE / README | documentación | 3 | M1–M6 | — |
+| M8 | Cerrar PTC en Haiku 5.5 vía Models API | externo | — | autorización | API key |
+| M9 | Evaluación con modelo real | externo | — | autorización | API key + costo |
+
+---
+
+## M1. Cortar escrituras después del fin de la ejecución
+
+**Problema (reproducido).** El host sigue ejecutando una llamada después de que la ejecución terminó. Con `approve` asíncrono más lento que el timeout de la ejecución, el caller recibe `Execution timed out` y, después, la herramienta de escritura se ejecuta igual, con la auditoría en `allowed / done`. Pasa en `WorkerExecutor`, `PooledWorkerExecutor` e inline, porque el wrapper de policy es el mismo. Las llamadas lanzadas sin `await` sufren lo mismo.
+
+**Diseño.**
+1. `withPolicy` crea por ejecución `state = { calls, seq, closed: false, abort: new AbortController() }` y envuelve `inner.execute` en `try/finally`. En el `finally` pone `closed = true` y llama a `abort.abort()`.
+2. `guardFns` revisa `state.closed`:
+   - al entrar, antes de reservar el cupo;
+   - **justo antes de `fn(args)`**, después de `approve` y del validador.
+   Si está cerrada, `release()` y `deny("execution already finished")`.
+3. `ApprovalRequest` gana `signal: AbortSignal` (opcional para quien lo implemente). La firma no cambia de forma incompatible.
+4. Una llamada que ya entró a `fn` no se puede cancelar (riesgo M3 existente). Si termina después del cierre, el registro de auditoría agrega `afterExecutionEnd: true`. `AuditRecord` gana ese campo opcional.
+5. `guardFns` exportada sin `state` sigue funcionando: el estado por defecto nunca se cierra. Se documenta.
+
+**Archivos.** `src/policy.ts`. Tipos en `src/index.ts` (sin export nuevo salvo el tipo). README §garantías.
+
+**Pruebas (Sonnet, a ciegas).**
+- Un `approve` que tarda más que `timeoutMs` no produce ninguna llamada a la herramienta, ni durante ni después; la auditoría lo registra como `denied` con esa razón. Se prueba con worker, pool e inline.
+- Una llamada sin `await` y con `approve` lento, en una ejecución que retorna enseguida, no ejecuta la escritura.
+- El `signal` llega abortado al aprobador cuando la ejecución termina.
+- Una herramienta de lectura en curso al cerrarse se audita con `afterExecutionEnd: true`.
+- Regresión: H1 (cupo con aprobación concurrente) sigue en verde.
+
+**Aceptación.** Después de que `execute` resuelve, no se invoca ninguna herramienta, sin excepción.
+**Riesgos.** Una carrera entre la revisión previa a `fn` y el cierre en el mismo tick; es aceptable porque el cierre ocurre en un `finally` asíncrono posterior. Hay que verificar que las ejecuciones normales no se cierren antes de tiempo con herramientas legítimas en vuelo: el executor ya espera a que termine el guest.
+**Esfuerzo.** Bajo, unas 40 líneas. Opus implementa y Sonnet prueba.
+
+---
+
+## M2. Colisión de nombres por puntuación
+
+**Problema (reproducido).** `read: ["delete_user"]` también autoriza `delete-user` cuando ambas herramientas existen, porque `matches()` compara nombres sanitizados. `src/discovery.ts:101` (visibilidad en `search_tools`) tiene la misma lógica.
+
+**Diseño (propuesto para D2).**
+1. Nueva función pura `collisions(names: string[]): Set<string>` con los nombres reales cuyo sanitizado es compartido.
+2. `matches(list, provider, tool, { exact })`: si `tool` está en una colisión, las listas `read`, `write` y `validate` comparan solo el nombre exacto (con o sin `proveedor.`). `deny` siempre compara sanitizado, porque denegar de más es fail-closed.
+3. `guardFns` calcula las colisiones una vez por proveedor. `discovery.ts` reutiliza la misma función para su filtro `g()`.
+4. Sin colisión, el comportamiento no cambia, así que H2 y M1 de la Fase 1 siguen igual.
+
+**Alternativa de D2.** Denegar siempre las herramientas que colisionan. Es más simple, pero las deja inutilizables.
+
+**Archivos.** `src/policy.ts`, `src/discovery.ts`. La documentación de `ToolPolicy` explica la regla.
+
+**Pruebas (Sonnet, a ciegas).**
+- Con `delete_user` y `delete-user` presentes y `read: ["delete_user"]`, solo se ejecuta `delete_user`; `delete-user` termina en `not classified`.
+- `deny: ["delete-user"]` con colisión deniega las dos variantes.
+- Sin colisión, `deny: ["delete-user"]` deniega `delete_user` (H2).
+- `search_tools` no muestra la variante no permitida.
+- Se cubren los tres executors y los dos servidores MCP.
+
+**Aceptación.** Ninguna allowlist autoriza un nombre real distinto del escrito cuando hay ambigüedad.
+**Esfuerzo.** Bajo. Opus implementa y Sonnet prueba.
+
+---
+
+## M3. Instalable como dependencia (build de distribución)
+
+**Problema (reproducido).** Node no hace type stripping bajo `node_modules`: `import "code-dope"` falla con `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`. El camino de instalación del README no funciona.
+
+**Diseño (propuesto para D1: build solo para distribución, `dist/` no commiteado).**
+1. `tsconfig.build.json`: `include: ["src"]`, `outDir: "dist"`, `declaration: true`, `rewriteRelativeImportExtensions: true` (TS 5.7 o superior; hay 5.9.3), `noEmit: false`, `allowImportingTsExtensions` compatible con ese rewrite.
+2. Script `build`: `tsc -p tsconfig.build.json`, más la copia de `src/sandbox/helpers.js` a `dist/sandbox/` (un script Node de unas 5 líneas, sin dependencias nuevas). El script `prepare` llama a `build`, así que npm construye al instalar desde git.
+3. `package.json#exports`: `{ ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" }, "./mcp": … }`, más `files: ["dist", "snippets", "catalog", "THIRD_PARTY_NOTICES.md"]`. En el repo, el desarrollo sigue importando `src/*.ts` por ruta relativa (tests, examples, bench), así que no necesita build.
+4. `WORKER_ENTRY`: resolverlo con la misma extensión del módulo actual: `new URL(\`./worker-entry${import.meta.url.endsWith(".ts") ? ".ts" : ".js"}\`, import.meta.url)`.
+5. `.gitignore` incluye `dist/`.
+6. CLAUDE.md: "sin build en desarrollo; `npm run build` solo para distribución". El README documenta la instalación.
+
+**Alternativa de D1.** Commitear `dist/`: sirve a consumidores que instalan sin devDependencies, a cambio de diffs duplicados y del riesgo de desincronización.
+
+**Pruebas.**
+- `tests/package.test.ts`: `npm run build`, `npm pack`, y luego instalar el `.tgz` en un directorio temporal (`os.tmpdir()` + `mkdtemp`). El consumidor importa `code-dope` y `code-dope/mcp` y corre `createCodeRunner` en worker y en pool. La prueba es lenta (unos 20 s), así que va en un script `test:pkg` incluido en `test:all`.
+- El typecheck del consumidor usa los `.d.ts`.
+
+**Aceptación.** Un proyecto externo instala desde git o desde el tarball y ejecuta código en los tres modos sin flags.
+**Riesgos.** Que `prepare` en una instalación desde git requiera devDependencies (npm las instala para `prepare`, pero conviene confirmarlo en la prueba). Que tsc no reescriba `new URL("./x.ts")`: por eso el punto 4.
+**Esfuerzo.** Medio. Lo implementa Opus o Sonnet.
+
+---
+
+## M4. Reemplazo precalentado en el pool
+
+**Problema (medido por Sonnet).** Después de un error, la siguiente ejecución cuesta ~100 ms, porque el reemplazo se crea en el camino crítico. La primera llamada tras construir el pool también puede salir en frío.
+
+**Diseño.**
+1. `#destroy()`: si `!closed && prewarm && slots.size < size`, lanza de inmediato un reemplazo (`#park(#spawn())`) en vez de esperar a la siguiente `execute`. No aplica al reaping por `idleMs`, que sí debe reducir el pool.
+2. `#acquire()`: prefiere un worker ocioso **ya listo**. Si solo hay workers arrancando, toma el que lleva más tiempo arrancando, en vez de crear otro.
+3. `stats` agrega `warming` (workers aún no listos).
+
+**Pruebas (Opus).**
+- Después de un error, `stats.alive === size` sin llamar a `execute`.
+- El reaping por `idleMs` sigue dejando `alive === 0`.
+- Las pruebas de contrato de la Fase 2 siguen en verde; en particular, `spawned` con `maxUses`, que podría cambiar de valor.
+
+**Bench.** Agregar los casos "pool, primera ejecución después de un error" y "pool en frío". El README separa los tres.
+**Aceptación.** La primera ejecución después de un error, con al menos 100 ms de margen, tiene p50 < 15 ms. Si no se cumple, se reporta igual.
+**Esfuerzo.** Bajo.
+
+---
+
+## M5. Respaldar afirmaciones [R] sin prueba
+
+| Afirmación | Acción |
+|---|---|
+| El modo inline bloquea el event loop (RESEARCH §5) | Prueba: 0 o muy pocos ticks durante un `for(;;)` inline, como contraparte de H3. |
+| `unwrap` y la rama `toolResult` (L5) | Prueba unitaria de `discovery.ts` con un upstream que devuelve `toolResult`. |
+| Con un heap grande, el GC hace que el timeout llegue antes del error de memoria (§5) | Prueba no frágil: con `memoryLimitBytes` alto y una asignación masiva, `error` matchea `/out of memory|timed out/`. Se documenta como no determinista. |
+| "24× menos `listTools` con 83 herramientas" (ARCHITECTURE) | Buscar el origen. Si no aparece, agregar el caso al bench con 83 herramientas sintéticas y reemplazar la cifra por la medida, o quitarla. |
+| El entry raíz de Cloudflare no carga en Node (§2.1) | Prueba: `import("@cloudflare/codemode")` rechaza con `/cloudflare:/`. Avisa si upstream lo arregla. |
+
+**Esfuerzo.** Bajo. Lo hace Opus.
+
+---
+
+## M6. Bench de carga sostenida del pool
+
+**Diseño.** `bench/soak.ts`, no incluido en `test:all`: unas 5 000 ejecuciones con mezcla de 90 % OK, 5 % throw y 5 % timeout corto, en un pool de tamaño 2 con `maxUses` 100 y 1 000. Mide RSS y heap del padre en cada tramo de 500, la latencia p50/p95 por tramo y `spawned`. Salida en `bench/SOAK.json`.
+**Aceptación.** Solo se reporta. Se marca alerta si el RSS crece más de un 50 % entre el primer y el último tramo, o si el p95 se degrada más de 2×.
+**Dependencia.** M4, para no medir la latencia de respawn ya corregida.
+**Esfuerzo.** Bajo. Lo puede hacer un Haiku como worker mecánico, con el diseño ya fijado.
+
+---
+
+## M7. Actualizar la documentación
+
+- **RESEARCH.md:**
+  - §1: `@cloudflare/codemode` 0.5.6 sigue siendo la última (publicada el 2026-10-29); `code_execution_20260521` es la versión vigente, con 90 s por celda; la CLI de UTCP es 0.1.1; quickjs-emscripten 0.32.0 sigue siendo la última (2026-02-16).
+  - §2.6: `openApiMcpServer` (`./mcp`) ofrece search + execute en Node.
+  - §2.13: falta en la documentación la frase "`allowed_callers` no es un límite de seguridad"; queda como [I]. Agregar las restricciones de PTC: no admite herramientas de conectores MCP, `strict: true` ni `tool_choice` forzado.
+  - §4 y §8: el advisory de isolated-vm pasa de [H] a confirmado por fuentes secundarias (crítico, corregido en 6.2.0 y 7.0.1); PTC en Haiku 5.5 queda confirmado por la documentación, pendiente M8.
+  - §5: el pool y su riesgo (módulo WASM reutilizado).
+  - §9: los 4 subagentes de esta revisión.
+  - §10 nuevo: Fase 2 y Fase 3.
+- **ARCHITECTURE.md:** diagrama con el pool y, si M3 se hace, una sección de distribución.
+- **README.md:** tabla de bench separando caliente, tras error y en frío; instalación (M3); garantías (M1, M2).
+- **Handoff:** `HANDOFF-…-PHASE-3.md`.
+
+**Esfuerzo.** Bajo. Lo hace Opus al final, con los números reales.
+
+---
+
+## M8. PTC en Haiku 5.5 vía Models API (externo)
+
+Una llamada `GET /v1/models/claude-haiku-5-5` para leer `capabilities.code_execution`. Requiere una API key en la sesión (vía `request_credential`) y tu autorización. Su costo es nulo o despreciable. Resultado: cierra RESEARCH §8.
+
+## M9. Evaluación con modelo real (externo)
+
+Fuera del alcance de esta fase, salvo que lo autorices. Para diseñarla conviene Opus con esfuerzo medio. Requiere API key y un presupuesto de gasto.
+
+---
+
+## Decisiones pendientes
+
+- **D1 (M3).** ¿Build solo para distribución, con `dist/` generado por `prepare` y no commiteado? **Recomendado.** La otra opción es commitear `dist/`.
+- **D2 (M2).** Con colisión, ¿allowlists exactas y `deny` sanitizado? **Recomendado.** La otra opción es denegar siempre las herramientas que colisionan.
+
+## Orden de ejecución
+
+M1 → M2 → M3 → M4 → M5 → M6 → M7. M8 y M9 solo con autorización. Un commit por mejora.
