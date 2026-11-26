@@ -21,6 +21,7 @@ export class PooledWorkerExecutor {
     #size;
     #maxUses;
     #idleMs;
+    #prewarm;
     #heapMb;
     #killGraceMs;
     #timeoutMs;
@@ -40,6 +41,7 @@ export class PooledWorkerExecutor {
         this.#size = size;
         this.#maxUses = maxUses;
         this.#idleMs = idleMs;
+        this.#prewarm = prewarm;
         this.#heapMb = workerHeapMb;
         this.#killGraceMs = killGraceMs;
         this.#timeoutMs = quickjs.timeoutMs ?? 30_000;
@@ -49,7 +51,11 @@ export class PooledWorkerExecutor {
                 this.#park(this.#spawn());
     }
     get stats() {
-        return { spawned: this.#spawned, alive: this.#slots.size, idle: this.#idle.length, busy: this.#slots.size - this.#idle.length, queued: this.#queue.length };
+        let warming = 0;
+        for (const slot of this.#slots)
+            if (!slot.isReady)
+                warming++;
+        return { spawned: this.#spawned, alive: this.#slots.size, idle: this.#idle.length, busy: this.#slots.size - this.#idle.length, queued: this.#queue.length, warming };
     }
     execute(code, providersOrFns, options) {
         if (options?.connectors?.length) {
@@ -77,13 +83,15 @@ export class PooledWorkerExecutor {
         });
         this.#spawned++;
         let markReady;
-        const slot = { worker, uses: 0, ready: new Promise((r) => (markReady = r)), dead: false };
+        const slot = { worker, uses: 0, isReady: false, ready: new Promise((r) => (markReady = r)), dead: false };
         this.#slots.add(slot);
         worker.on("message", (m) => {
-            if (m.type === "ready")
+            if (m.type === "ready") {
+                slot.isReady = true;
                 markReady(null);
+            }
             else if (m.type === "failed")
-                markReady(`Sandbox worker failed to start: ${m.error}`);
+                dead(`Sandbox worker failed to start: ${m.error}`);
             else
                 slot.onMessage?.(m);
         });
@@ -91,9 +99,7 @@ export class PooledWorkerExecutor {
             markReady(reason);
             if (slot.dead)
                 return;
-            slot.dead = true;
-            this.#forget(slot);
-            slot.onDead?.(reason);
+            void this.#destroy(slot, reason);
         };
         worker.on("error", (e) => dead(`Sandbox worker failed: ${e.message}`));
         worker.on("exit", (c) => dead(`Sandbox worker exited (code ${c})`));
@@ -102,7 +108,9 @@ export class PooledWorkerExecutor {
     #acquire() {
         if (this.#closed)
             return Promise.resolve(null);
-        const idle = this.#idle.pop();
+        const ready = this.#idle.findIndex((slot) => slot.isReady);
+        // Starting workers are parked in creation order: take the oldest if none is ready.
+        const idle = this.#idle.splice(ready < 0 ? 0 : ready, 1)[0];
         if (idle)
             return Promise.resolve(this.#take(idle));
         if (this.#slots.size < this.#size)
@@ -141,13 +149,17 @@ export class PooledWorkerExecutor {
             this.#idle.splice(i, 1);
     }
     async #destroy(slot, reason) {
-        if (!slot.dead) {
-            slot.dead = true;
-            this.#forget(slot);
-            slot.onDead?.(reason);
-        }
-        await slot.worker.terminate();
-        this.#refill();
+        if (slot.dead)
+            return;
+        slot.dead = true;
+        this.#forget(slot);
+        slot.onDead?.(reason);
+        const terminated = slot.worker.terminate();
+        if (!this.#closed && this.#prewarm && reason !== "idle" && this.#slots.size < this.#size)
+            this.#park(this.#spawn());
+        else
+            this.#refill();
+        await terminated;
     }
     #run(slot, code, providers) {
         const job = ++this.#nextJob;

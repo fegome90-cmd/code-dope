@@ -8,7 +8,7 @@ export interface PooledWorkerExecutorOptions extends WorkerExecutorOptions {
     maxUses?: number;
     /** Idle workers are terminated after this many ms (0 = never). Default 30_000. */
     idleMs?: number;
-    /** Spawn `size` workers at construction. Default true. */
+    /** Pre-warm workers at construction and after recycling (except idle reaping). Default true. */
     prewarm?: boolean;
 }
 export interface PoolStats {
@@ -17,6 +17,7 @@ export interface PoolStats {
     idle: number;
     busy: number;
     queued: number;
+    warming: number;
 }
 export declare class PooledWorkerExecutor implements Executor {
     #private;

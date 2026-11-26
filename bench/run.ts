@@ -109,17 +109,45 @@ async function median<T extends { ms: number }>(f: () => Promise<T>) {
   return { ...xs[Math.floor(runs / 2)], msP10: q(0.1), msP90: q(0.9), msP95: q(0.95) };
 }
 
+async function poolWarm() {
+  const pool = createDefaultExecutor("pool", { size: 2 });
+  try {
+    await candidate(undefined, "pool", pool); // warm-up
+    return await median(() => candidate(undefined, "pool", pool));
+  } finally { await pool.close(); }
+}
+
+async function poolAfterError() {
+  const pool = createDefaultExecutor("pool", { size: 1 });
+  try {
+    return await median(async () => {
+      const failed = await pool.execute("async () => { throw new Error('bench-recycle'); }", {});
+      if (!failed.error?.includes("bench-recycle")) throw new Error("Expected pool recycling error was not returned");
+      await new Promise<void>((resolve) => setTimeout(resolve, 150));
+      return candidate(undefined, "pool", pool);
+    });
+  } finally { await pool.close(); }
+}
+
+async function poolCold() {
+  return median(async () => {
+    // Defer worker creation until the timed execution, even while MCP connects.
+    const pool = createDefaultExecutor("pool", { size: 1, prewarm: false });
+    try { return await candidate(undefined, "pool", pool); }
+    finally { await pool.close(); }
+  });
+}
+
 const b = await median(() => baseline());
 const c = await median(() => candidate());
 const ci = await median(() => candidate(undefined, "inline"));
-// One shared, pre-warmed pool: measures warm executions (the pool's steady state), not start-up.
-const pool = createDefaultExecutor("pool", { size: 2 });
-await candidate(undefined, "pool", pool); // warm-up
-const cp = await median(() => candidate(undefined, "pool", pool));
-await pool.close();
+const cp = await poolWarm();
+const cpa = await poolAfterError();
+const cpc = await poolCold();
 const sumB = b.resultsToModel.reduce((a, x) => a + x, 0);
 const correctB = JSON.stringify(b.picked) === JSON.stringify(truth);
-const correctC = JSON.stringify(c.out.orders) === JSON.stringify(truth) && c.out.sum === truthSum && JSON.stringify(ci.out) === JSON.stringify(c.out) && JSON.stringify(cp.out) === JSON.stringify(c.out);
+const correctC = JSON.stringify(c.out.orders) === JSON.stringify(truth) && c.out.sum === truthSum
+  && [ci, cp, cpa, cpc].every((result) => JSON.stringify(result.out) === JSON.stringify(c.out));
 
 const bf = await baseline("c-1");
 const cf = await candidate("c-1");
@@ -129,15 +157,20 @@ const report = {
   date: new Date().toISOString(),
   node: process.version,
   runs,
+  poolScenarios: {
+    warm: { size: 2, prewarm: true, warmupExecutions: 1 },
+    afterError: { size: 1, prewarm: true, recoveryMarginMs: 150, p50TargetMs: 15, meetsTarget: cpa.ms < 15 },
+    cold: { size: 1, prewarm: false, newPoolPerSample: true },
+  },
   measured: {
     toolInvocations: { baseline: b.toolCalls, candidate: c.toolCalls },
     toolOutputCharsReachingModel: { baseline: sumB, candidate: c.resultsToModel[0] },
     toolDefinitionChars: { baseline: b.defsChars, candidate: c.defsChars },
     candidateCodeChars_modelOutput: c.codeChars,
     toolWallClockMsMedian: {
-      baseline: +b.ms.toFixed(2), candidateWorker: +c.ms.toFixed(2), candidatePoolWarm: +cp.ms.toFixed(2), candidateInline: +ci.ms.toFixed(2),
-      p10p90: { baseline: [+b.msP10.toFixed(2), +b.msP90.toFixed(2)], candidateWorker: [+c.msP10.toFixed(2), +c.msP90.toFixed(2)], candidatePoolWarm: [+cp.msP10.toFixed(2), +cp.msP90.toFixed(2)], candidateInline: [+ci.msP10.toFixed(2), +ci.msP90.toFixed(2)] },
-      p95: { baseline: +b.msP95.toFixed(2), candidateWorker: +c.msP95.toFixed(2), candidatePoolWarm: +cp.msP95.toFixed(2), candidateInline: +ci.msP95.toFixed(2) },
+      baseline: +b.ms.toFixed(2), candidateWorker: +c.ms.toFixed(2), candidatePoolWarm: +cp.ms.toFixed(2), candidatePoolAfterError: +cpa.ms.toFixed(2), candidatePoolCold: +cpc.ms.toFixed(2), candidateInline: +ci.ms.toFixed(2),
+      p10p90: { baseline: [+b.msP10.toFixed(2), +b.msP90.toFixed(2)], candidateWorker: [+c.msP10.toFixed(2), +c.msP90.toFixed(2)], candidatePoolWarm: [+cp.msP10.toFixed(2), +cp.msP90.toFixed(2)], candidatePoolAfterError: [+cpa.msP10.toFixed(2), +cpa.msP90.toFixed(2)], candidatePoolCold: [+cpc.msP10.toFixed(2), +cpc.msP90.toFixed(2)], candidateInline: [+ci.msP10.toFixed(2), +ci.msP90.toFixed(2)] },
+      p95: { baseline: +b.msP95.toFixed(2), candidateWorker: +c.msP95.toFixed(2), candidatePoolWarm: +cp.msP95.toFixed(2), candidatePoolAfterError: +cpa.msP95.toFixed(2), candidatePoolCold: +cpc.msP95.toFixed(2), candidateInline: +ci.msP95.toFixed(2) },
     },
     correct: { baseline: correctB, candidate: correctC },
     onFailure_customer_c1_unavailable: {

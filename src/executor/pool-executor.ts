@@ -26,11 +26,11 @@ export interface PooledWorkerExecutorOptions extends WorkerExecutorOptions {
   maxUses?: number;
   /** Idle workers are terminated after this many ms (0 = never). Default 30_000. */
   idleMs?: number;
-  /** Spawn `size` workers at construction. Default true. */
+  /** Pre-warm workers at construction and after recycling (except idle reaping). Default true. */
   prewarm?: boolean;
 }
 
-export interface PoolStats { spawned: number; alive: number; idle: number; busy: number; queued: number }
+export interface PoolStats { spawned: number; alive: number; idle: number; busy: number; queued: number; warming: number }
 
 type DoneMsg = { type: "done"; job: number; result: ExecuteResult };
 type WorkerMsg = CallMsg | DoneMsg | { type: "ready" } | { type: "failed"; error: string };
@@ -38,6 +38,7 @@ type WorkerMsg = CallMsg | DoneMsg | { type: "ready" } | { type: "failed"; error
 interface Slot {
   worker: Worker;
   uses: number;
+  isReady: boolean;
   ready: Promise<string | null>; // null = ready, string = start-up error
   idleTimer?: NodeJS.Timeout;
   onMessage?: (m: CallMsg | DoneMsg) => void;
@@ -49,6 +50,7 @@ export class PooledWorkerExecutor implements Executor {
   readonly #size: number;
   readonly #maxUses: number;
   readonly #idleMs: number;
+  readonly #prewarm: boolean;
   readonly #heapMb: number;
   readonly #killGraceMs: number;
   readonly #timeoutMs: number;
@@ -67,6 +69,7 @@ export class PooledWorkerExecutor implements Executor {
     this.#size = size;
     this.#maxUses = maxUses;
     this.#idleMs = idleMs;
+    this.#prewarm = prewarm;
     this.#heapMb = workerHeapMb;
     this.#killGraceMs = killGraceMs;
     this.#timeoutMs = quickjs.timeoutMs ?? 30_000;
@@ -75,7 +78,9 @@ export class PooledWorkerExecutor implements Executor {
   }
 
   get stats(): PoolStats {
-    return { spawned: this.#spawned, alive: this.#slots.size, idle: this.#idle.length, busy: this.#slots.size - this.#idle.length, queued: this.#queue.length };
+    let warming = 0;
+    for (const slot of this.#slots) if (!slot.isReady) warming++;
+    return { spawned: this.#spawned, alive: this.#slots.size, idle: this.#idle.length, busy: this.#slots.size - this.#idle.length, queued: this.#queue.length, warming };
   }
 
   execute(code: string, providersOrFns: ResolvedProvider[] | Fns, options?: ExecuteOptions): Promise<ExecuteResult> {
@@ -104,19 +109,17 @@ export class PooledWorkerExecutor implements Executor {
     });
     this.#spawned++;
     let markReady!: (v: string | null) => void;
-    const slot: Slot = { worker, uses: 0, ready: new Promise((r) => (markReady = r)), dead: false };
+    const slot: Slot = { worker, uses: 0, isReady: false, ready: new Promise((r) => (markReady = r)), dead: false };
     this.#slots.add(slot);
     worker.on("message", (m: WorkerMsg) => {
-      if (m.type === "ready") markReady(null);
-      else if (m.type === "failed") markReady(`Sandbox worker failed to start: ${m.error}`);
+      if (m.type === "ready") { slot.isReady = true; markReady(null); }
+      else if (m.type === "failed") dead(`Sandbox worker failed to start: ${m.error}`);
       else slot.onMessage?.(m);
     });
     const dead = (reason: string) => {
       markReady(reason);
       if (slot.dead) return;
-      slot.dead = true;
-      this.#forget(slot);
-      slot.onDead?.(reason);
+      void this.#destroy(slot, reason);
     };
     worker.on("error", (e) => dead(`Sandbox worker failed: ${e.message}`));
     worker.on("exit", (c) => dead(`Sandbox worker exited (code ${c})`));
@@ -125,7 +128,9 @@ export class PooledWorkerExecutor implements Executor {
 
   #acquire(): Promise<Slot | null> {
     if (this.#closed) return Promise.resolve(null);
-    const idle = this.#idle.pop();
+    const ready = this.#idle.findIndex((slot) => slot.isReady);
+    // Starting workers are parked in creation order: take the oldest if none is ready.
+    const idle = this.#idle.splice(ready < 0 ? 0 : ready, 1)[0];
     if (idle) return Promise.resolve(this.#take(idle));
     if (this.#slots.size < this.#size) return Promise.resolve(this.#take(this.#spawn()));
     return new Promise((resolve) => this.#queue.push(resolve));
@@ -163,13 +168,14 @@ export class PooledWorkerExecutor implements Executor {
   }
 
   async #destroy(slot: Slot, reason: string): Promise<void> {
-    if (!slot.dead) {
-      slot.dead = true;
-      this.#forget(slot);
-      slot.onDead?.(reason);
-    }
-    await slot.worker.terminate();
-    this.#refill();
+    if (slot.dead) return;
+    slot.dead = true;
+    this.#forget(slot);
+    slot.onDead?.(reason);
+    const terminated = slot.worker.terminate();
+    if (!this.#closed && this.#prewarm && reason !== "idle" && this.#slots.size < this.#size) this.#park(this.#spawn());
+    else this.#refill();
+    await terminated;
   }
 
   #run(slot: Slot, code: string, providers: ResolvedProvider[]): Promise<ExecuteResult> {
