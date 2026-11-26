@@ -6,3 +6,5 @@
 4. Trabaja en rama y limpia tu entorno temporal sin borrar cambios ajenos. Revisión independiente cuando el impacto lo amerite. Evidencia técnica no autoriza merge, publicación, permisos, secretos ni cambios destructivos. No reutilices excepciones de otros repositorios.
 
 Adaptación local de la [Constitución Agéntica v1.1](https://github.com/fegome90-cmd/constitucion-ai/blob/cdb626e0960e88e3be1ce4a1755f5441a1dbe251/constitution/AGENTIC-CONSTITUTION.md). La fuente no se copia ni se importa como dependencia. El repositorio no declara una licencia pública.
+
+Para commits, PR, verificaciones y merges, sigue [Cómo trabajamos](CONTRIBUTING.md). La CI es evidencia, no autorización.

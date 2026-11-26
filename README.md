@@ -12,4 +12,4 @@ pnpm test
 
 La prueba construye el paquete, inspecciona el tarball e instala ese archivo en un proyecto aislado para comprobar el import y los tipos. No publica nada.
 
-[Hoja de ruta y fuentes](docs/roadmap.md) · [Normas para agentes](AGENTS.md)
+[Hoja de ruta y fuentes](docs/roadmap.md) · [Normas para agentes](AGENTS.md) · [Flujo de contribución](CONTRIBUTING.md)
