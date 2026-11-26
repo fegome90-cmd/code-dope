@@ -104,7 +104,7 @@ Los diseños aprobados siguientes se conservan como especificación; las notas d
    - `files: ["dist", "snippets", "catalog", "THIRD_PARTY_NOTICES.md", "README.md"]`;
    - sin `prepare`.
    En el repo, los tests, examples y bench siguen importando `src/*.ts` por ruta relativa, así que el desarrollo sigue sin build.
-5. **Verificación de deriva:** script `check:dist` (`npm run build && git diff --exit-code -- dist/`) incluido en `test:all`. Si alguien cambia `src/` sin reconstruir, `test:all` falla.
+5. **Verificación de deriva:** script `check:dist` (`npm run build && node scripts/check-dist.mjs`) incluido en `test:all`. Si alguien cambia `src/` sin reconstruir, `test:all` falla.
 6. `.gitattributes`: `dist/** linguist-generated=true -diff`, para que los diffs y las revisiones de PR no se inflen.
 7. CLAUDE.md:
    - "sin build en desarrollo; después de cambiar `src/` corre `npm run build` y commitea `dist/` (lo verifica `test:all`)";
@@ -222,7 +222,7 @@ En los casos OK funcionaron el worker y el pool desde `dist/`.
 
 Documentación verificada por el revisor: Bun no ejecuta scripts de dependencias que no estén en `trustedDependencies`, y Yarn Berry usa `prepack` en vez de `prepare` para dependencias git [O doc, no probado]. Node rechaza a propósito el type stripping en `node_modules` y recomienda publicar JS [O doc].
 
-**Confirmada: B**, con una verificación de deriva en `test:all` (`npm run build && git diff --exit-code dist/`) para que `dist/` no quede desfasado de `src/`. Funciona con cualquier gestor sin configuración del consumidor. El costo son diffs duplicados en cada cambio.
+**Confirmada: B**, con una verificación de deriva en `test:all` (`npm run build && node scripts/check-dist.mjs`) para que `dist/` no quede desfasado de `src/`. Funciona con cualquier gestor sin configuración del consumidor. El costo son diffs duplicados en cada cambio.
 
 Variante B′: `dist/` solo en tags de release, generado por un script, con los consumidores fijados a `#vX.Y.Z`. Deja `main` limpio, pero exige disciplina de release. Se puede adoptar más adelante.
 

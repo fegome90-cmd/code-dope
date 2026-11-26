@@ -61,7 +61,7 @@ Un plugin de ChatGPT, Claude Code y un servidor MCP independiente **no** tienen 
 
 `dist/` está commiteado: `code-dope` y `code-dope/mcp` exportan JavaScript y declaraciones TypeScript. No hay `prepare`, de modo que instalar la dependencia no necesita compilarla ni autorizar scripts de build. `npm run build` borra `dist/`, emite con TypeScript **5.9.3** y copia `src/sandbox/` porque `helpers.ts` carga `helpers.js` desde disco. `WORKER_ENTRY` selecciona `.ts` en desarrollo y `.js` en el build; esa URL no la reescribe tsc.
 
-Cada commit que cambia `src/` incluye su build. `check:dist` reconstruye y compara `dist/` con el índice de Git; por eso el build actualizado debe estar agregado al índice antes del gate. `test:pkg` hace `npm pack`, instala el tarball en un directorio creado con `mkdtemp` y ejecuta consumidores inline, worker, pool y TypeScript. El gate completo es `npm run test:all`.
+Cada commit que cambia `src/` incluye su build. `check:dist` reconstruye y compara `dist/` con el índice de Git y rechaza archivos generados sin versionar; por eso el build actualizado debe estar agregado al índice antes del gate. `test:pkg` hace `npm pack`, instala el tarball en un directorio creado con `mkdtemp` y ejecuta consumidores inline, worker, pool y TypeScript. El gate completo es `npm run test:all`.
 
 Se verificó la instalación del tarball con npm 11.19.1 y Node v24.22.3 en esta fase. Las instalaciones desde `git+file://` con npm 10.9.9 y pnpm 10.28 pertenecen al prototipo D1 documentado en [PLAN.md](PLAN.md). Bun sigue sin prueba directa.
 

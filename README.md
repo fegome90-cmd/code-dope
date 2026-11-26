@@ -27,7 +27,7 @@ npm install 'git+ssh://git@github.com/fegome90-cmd/code-dope.git#<tag-o-commit>'
 
 Importa `code-dope` o `code-dope/mcp`. No hay `prepare` ni compilación al instalar; el paquete no requiere permitir scripts de build en npm, pnpm o Bun. La instalación del tarball con npm se verifica en `test:pkg`; npm y pnpm desde Git tienen evidencia del prototipo D1, y Bun queda pendiente de ejecución directa. La autenticación de Git depende del acceso al repositorio.
 
-Tras modificar `src/`, ejecuta `npm run build` y agrega `src/` y `dist/` al mismo commit. `check:dist` reconstruye con TypeScript 5.9.3 y exige que `dist/` coincida con el índice de Git; agrega el build actualizado al índice antes de la verificación previa al commit. `test:pkg` instala un tarball en un directorio temporal y prueba inline, worker, pool y consumo TypeScript.
+Tras modificar `src/`, ejecuta `npm run build` y agrega `src/` y `dist/` al mismo commit. `check:dist` reconstruye con TypeScript 5.9.3 y exige que `dist/` coincida con el índice de Git y no contenga archivos sin versionar; agrega el build actualizado al índice antes de la verificación previa al commit. `test:pkg` instala un tarball en un directorio temporal y prueba inline, worker, pool y consumo TypeScript.
 
 ## Uso rápido
 

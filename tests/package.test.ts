@@ -7,17 +7,24 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
-const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+// npm supplies its JS entry point to scripts on every platform. Avoid spawning
+// npm.cmd or composing a shell command, including for temporary paths with spaces.
+function npm(args: string[], cwd: string, timeout: number): string {
+  const cli = process.env.npm_execpath;
+  assert.ok(cli, "Run this test with npm run test:pkg (npm_execpath is required)");
+  return execFileSync(process.execPath, [cli, ...args], { cwd, encoding: "utf8", timeout });
+}
 
 test("M3: packed dependency runs inline, worker and pool, and exposes usable declarations", { timeout: 120_000 }, () => {
-  const temp = mkdtempSync(join(tmpdir(), "code-dope-package-"));
+  const temp = mkdtempSync(join(tmpdir(), "code dope package-"));
   try {
-    const packed = JSON.parse(execFileSync(npm, ["pack", "--json", "--pack-destination", temp], { cwd: root, encoding: "utf8", timeout: 30_000 }))[0] as { filename: string; files: Array<{ path: string }> };
+    const packed = JSON.parse(npm(["pack", "--json", "--pack-destination", temp], root, 30_000))[0] as { filename: string; files: Array<{ path: string }> };
     const files = packed.files.map((f) => f.path);
     for (const path of ["dist/index.js", "dist/index.d.ts", "dist/mcp.js", "dist/executor/worker-entry.js", "dist/sandbox/helpers.js"]) assert.ok(files.includes(path), `missing ${path}`);
     assert.ok(!files.some((f) => f.startsWith("src/")), "the package must distribute compiled code");
+    assert.ok(!files.some((f) => f.includes("__pycache__") || /\.py[cod]$/.test(f)), "the package must not contain Python bytecode");
     writeFileSync(join(temp, "package.json"), JSON.stringify({ name: "code-dope-consumer", private: true, type: "module" }));
-    execFileSync(npm, ["install", join(temp, packed.filename), "--no-audit", "--no-fund"], { cwd: temp, encoding: "utf8", timeout: 80_000 });
+    npm(["install", join(temp, packed.filename), "--no-audit", "--no-fund"], temp, 80_000);
     const installed = JSON.parse(readFileSync(join(temp, "node_modules/code-dope/package.json"), "utf8"));
     assert.equal(installed.scripts.prepare, undefined);
     writeFileSync(join(temp, "consumer.mjs"), `

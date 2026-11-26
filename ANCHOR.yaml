@@ -1,0 +1,18 @@
+# Contexto del proyecto. Las normas operativas viven en AGENTS.md y CONTRIBUTING.md.
+schema_version: 1
+project: code-dope
+goal: Reutilizar Code Mode con sandbox QuickJS-WASM y policy host fail-closed en plugins y servidores MCP.
+scope:
+  - Biblioteca TypeScript experimental para Node, con catálogo de herramientas explícito.
+  - Código guest aislado; aprobación, límites y auditoría de llamadas host.
+  - Adaptadores opt-in, separados del núcleo.
+not_in_scope:
+  - Ejecución de código del modelo en el host o registro implícito de herramientas.
+  - Publicación, credenciales y efectos de red implícitos.
+references:
+  rules: AGENTS.md
+  collaboration: CONTRIBUTING.md
+  roadmap: docs/roadmap.md
+  vocabulary: GLOSSARY.md
+  security: SECURITY.md
+  phase3: PLAN.md

@@ -25,10 +25,11 @@
     "example:plugin": "node examples/plugin-consumer/run.ts",
     "example:mcp": "node examples/mcp-client/run.ts",
     "test:py": "python3 -B -m unittest tests/test_ptc_helpers.py",
-    "test:all": "npm run check:dist && npm test && npm run test:py && npm run typecheck && npm run test:pkg",
+    "test:all": "npm run check:dist && npm test && npm run test:py && npm run typecheck && npm run test:infra && npm run test:pkg",
     "build": "node scripts/build.mjs",
-    "check:dist": "npm run build && git diff --exit-code -- dist/",
-    "test:pkg": "node --test tests/package.test.ts"
+    "check:dist": "npm run build && node scripts/check-dist.mjs",
+    "test:pkg": "node --test tests/package.test.ts",
+    "test:infra": "node --test scripts/*.test.mjs"
   },
   "dependencies": {
     "@cfworker/json-schema": "^4.1.1",
@@ -53,5 +54,6 @@
     "catalog",
     "THIRD_PARTY_NOTICES.md",
     "README.md"
-  ]
+  ],
+  "packageManager": "npm@11.19.1"
 }
