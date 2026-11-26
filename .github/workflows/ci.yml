@@ -1,9 +1,9 @@
 name: Bootstrap
 on:
   pull_request:
-    branches: [main]
+    branches: [developer, tester, main]
   push:
-    branches: [main]
+    branches: [tester, main]
 permissions:
   contents: read
 jobs:
