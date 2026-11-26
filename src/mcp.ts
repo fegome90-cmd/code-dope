@@ -36,6 +36,8 @@ export interface CodeModeMcpOptions {
   description?: string;
 }
 
+export { createSearchExecuteMcpServer, type SearchExecuteOptions } from "./discovery.ts";
+
 export async function createCodeModeMcpServer(o: CodeModeMcpOptions): Promise<McpServer> {
   const inner =
     o.executor ??

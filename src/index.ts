@@ -15,3 +15,4 @@ export { RECIPES, paginatedFilter, fanOutEnrich, guardedBulkUpdate, type Recipe 
 export { createCodeRunner, type CodeRunner, type CodeRunnerOptions } from "./runner.ts";
 export { normalizeCode } from "./vendor/cf-normalize.ts";
 export type { Executor, ExecuteResult, ResolvedProvider } from "@cloudflare/codemode";
+export { searchTools, typesFor, type ToolEntry } from "./discovery.ts";

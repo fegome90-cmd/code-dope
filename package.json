@@ -17,13 +17,15 @@
     "typecheck": "tsc --noEmit",
     "bench": "node bench/run.ts",
     "example:plugin": "node examples/plugin-consumer/run.ts",
-    "example:mcp": "node examples/mcp-client/run.ts"
+    "example:mcp": "node examples/mcp-client/run.ts",
+    "test:py": "python3 -m unittest tests/test_ptc_helpers.py",
+    "test:all": "npm test && npm run test:py && npm run typecheck"
   },
   "dependencies": {
+    "@cfworker/json-schema": "^4.1.1",
     "@cloudflare/codemode": "0.5.6",
     "acorn": "^8.17.0",
-    "quickjs-emscripten": "0.32.0",
-    "@cfworker/json-schema": "^4.1.1"
+    "quickjs-emscripten": "0.32.0"
   },
   "peerDependencies": {
     "@modelcontextprotocol/sdk": "^1.25.0",
@@ -31,6 +33,7 @@
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
+    "@types/json-schema": "^7.0.15",
     "@types/node": "^22.0.0",
     "typescript": "^5.9.0",
     "zod": "^4.6.7"
