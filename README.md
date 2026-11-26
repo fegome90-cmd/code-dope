@@ -147,4 +147,4 @@ examples/  tests/  bench/
 
 Cómo ampliar: agrega un helper en `src/sandbox/helpers.js` (sin imports ni timers) o una recipe en `src/recipes.ts` (valida identificadores e incrusta parámetros con `JSON.stringify`). Después agrega una prueba y una entrada en `catalog/patterns.json`.
 
-Documentos: [RESEARCH.md](RESEARCH.md) · [ARCHITECTURE.md](ARCHITECTURE.md) · [Revisión del PR #2](docs/PR2-READINESS.md) · [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). La discrepancia de licencia del proyecto está pendiente de decisión del dueño; ver [SECURITY.md](SECURITY.md).
+Documentos: [RESEARCH.md](RESEARCH.md) · [ARCHITECTURE.md](ARCHITECTURE.md) · [Revisión del PR #2](docs/PR2-READINESS.md) · [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). El código propio se distribuye bajo [MIT](LICENSE), copyright © 2026 Felipe González, según la decisión del dueño registrada en [SECURITY.md](SECURITY.md).

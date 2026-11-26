@@ -14,7 +14,7 @@ Fecha: 2026-11-26. [PR #2](https://github.com/fegome90-cmd/code-dope/pull/2), ra
 | Escaneo del índice de #4 | PASS | `check-secrets.sh`, `scan-staged-secrets.mjs`, su test y `.gitleaks.toml` coinciden byte a byte con la base. Pasaron el escaneo staged y el histórico con Gitleaks 8.30.1 verificado. Se retiraron los dos `.pyc` versionados, sin reescribir el historial ni añadir exclusiones al scanner. |
 | CI de integración | PASS | [Run 45830289074](https://github.com/fegome90-cmd/code-dope/actions/runs/45830289074), sólo para `8dcc765`: los tres checks requeridos y `package-windows` terminaron con éxito. Se leyó el log de `package`: corre `npm run test:all`, no el smoke del bootstrap. |
 | Gate local del candidato funcional | PASS | `npm ci` y `npm run test:all`: **177 JS, 5 Python, 5 infraestructura, 1 tarball**, typecheck y `check:dist`, cero fallos y saltados. Node v24.22.3, npm 11.19.1, TypeScript 5.9.3. |
-| CI del candidato funcional | NOT_VERIFIED en este registro previo a publicar | No se atribuye el verde de integración a los cambios posteriores. La descripción del PR incorpora el run y SHA final una vez observados. |
+| CI del candidato funcional | PASS | [Run 45835034467](https://github.com/fegome90-cmd/code-dope/actions/runs/45835034467) de `cc0597784443d1a64df1c9282e9828c8feafc2d4`: tres checks requeridos y paquete Windows verdes. El merge sintético `9c5fdeead0fbeadb6fcee67ef867c7a436c70dc5` tiene el mismo árbol `57bb67927b0c0ccb72dd26efa939212a3f0dff6c` que el candidato y los revisores evaluaron. El commit posterior de licencia se verifica por separado en la descripción del PR. |
 | Integración con sistemas externos | NOT_VERIFIED | Sólo fixtures sintéticos y MCP en memoria/stdio. No se usaron datos reales, credenciales, otros repositorios, modelos de pago ni servicios de producción. |
 
 El mismo workflow ejecuta el gate completo en Ubuntu y un job adicional de distribución en Windows (`check:dist` y `test:pkg`). El job Windows no ejecuta toda la suite funcional. El consumidor del tarball usa una ruta temporal con espacios y llama la CLI JavaScript de npm mediante el ejecutable Node, sin depender de `npm.cmd` ni del shell. Incluye inline, worker, pool e imports/declaraciones de ambos exports.
@@ -23,7 +23,7 @@ La distribución se reconstruyó y agregó al índice junto con las fuentes, inc
 
 ## Disposición de cada hilo
 
-La columna inicial describe el corte `dcd5323`; “desactualizado” no equivale a resuelto. **PASS** significa que la disposición está respaldada por código y evidencia del candidato. Los cierres remotos se verifican después de publicar; las URLs permiten revisar cada conversación original.
+La columna inicial describe el corte `dcd5323`; “desactualizado” no equivale a resuelto. **PASS** significa que la disposición está respaldada por código y evidencia del candidato. Después de publicar `cc05977` se verificaron **26/26 hilos resueltos, cero abiertos**, y GitHub informó `mergeable: true` y `mergeable_state: clean`; las URLs permiten revisar cada conversación original.
 
 | Hilo | Estado inicial | Disposición | Evidencia específica |
 |---|---|---|---|
@@ -82,7 +82,7 @@ Se ejecutó [pool-lifecycle.ts](../bench/pool-lifecycle.ts), fuera de `test:all`
 
 Estas pruebas acreditan contratos de ciclo de vida; no contienen una traza nativa del fallo original y no demuestran estabilidad general. **Pool sigue opt-in y el default sigue siendo WorkerExecutor**, comprobado por una regresión explícita. No se necesita cambiar el contrato de default aprobado. Los workers comparten proceso, el stderr del pool se silencia y la cola sigue sin límite. Los timings de esta traza no se usan como benchmark.
 
-**Licencia — BLOCKED por decisión del dueño.** `package.json` conserva `license: "MIT"` y falta un LICENSE propio. Los notices de terceros no cubren esa decisión. No se añadió, retiró ni cambió una licencia por inferencia. El dueño debe confirmar licencia y titular antes de cerrar esta discrepancia; ver [SECURITY.md](../SECURITY.md).
+**Licencia — PASS por autorización expresa del dueño, 2026-11-26.** Se añadió [LICENSE](../LICENSE) con el texto MIT y copyright «2026 Felipe González», manteniendo `license: "MIT"` en `package.json`. La decisión cierra la discrepancia anterior; no se infirió del metadata. Los notices y el código de terceros permanecen intactos. El paquete sigue con `private: true` y no se autorizó merge, publicación ni despliegue; ver [SECURITY.md](../SECURITY.md).
 
 Los benchmarks de [RESULTS.json](../bench/RESULTS.json) y del soak siguen siendo evidencia histórica de Fase 3. No se presentan como medida del candidato corregido, ahorro de tokens, latencia end-to-end ni estabilidad probada. M8/M9, modelos de pago, publicación, despliegues y merge permanecen fuera del encargo.
 
