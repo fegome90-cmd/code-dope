@@ -28,7 +28,7 @@ Reutilizar primero y escribir solo lo que falta. Este es el único código nuevo
 
 | Candidato | Decisión | Dónde |
 |---|---|---|
-| Tool Discovery | Sí: búsqueda léxica + tipos por subconjunto. Reduce 24× el tamaño de `listTools` con 83 herramientas [R] | `discovery.ts` |
+| Tool Discovery | Sí: búsqueda léxica + tipos por subconjunto. En el caso de 83 herramientas, el JSON de `listTools().tools` baja de 39 816 a 1 709 caracteres: **23,30×** [R, tres corridas idénticas; `tests/discovery.test.ts`, umbral 20×]. No mide número de llamadas ni tokens. | `discovery.ts` |
 | Schema / Interface | Reutilizado: generador de Cloudflare vendorizado | `vendor/cf-json-schema-types.ts` |
 | Tool Composition | Sí, como helpers dentro del sandbox, no como framework | `sandbox/helpers.js` |
 | Execution | Solo para Node, donde no existía. Worker por defecto, después de la revisión S3 | `executor/` |

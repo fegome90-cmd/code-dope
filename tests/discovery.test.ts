@@ -49,6 +49,7 @@ test("progressive discovery keeps the initial tool context small vs. all-types-i
   const prog = await connect(await createSearchExecuteMcpServer({ upstream: bigCatalogServer(80).server, policy: { read: [] } }));
   const size = async (c: Client) => JSON.stringify((await c.listTools()).tools).length;
   const fullChars = await size(full), progChars = await size(prog);
-  console.log(`listTools chars: codeMcpServer=${fullChars} searchExecute=${progChars}`);
-  assert.ok(progChars * 5 < fullChars);
+  const ratio = fullChars / progChars;
+  console.log(`listTools chars: codeMcpServer=${fullChars} searchExecute=${progChars} full/progressive=${ratio.toFixed(2)}x`);
+  assert.ok(ratio >= 20, `Expected at least 20x smaller initial tool context; observed ${ratio.toFixed(2)}x`);
 });
