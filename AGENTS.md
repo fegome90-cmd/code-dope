@@ -1,10 +1,18 @@
-# Reglas de Code Dope
+# Guía de Code Dope
 
-1. Antes de editar, lee los contratos y pruebas vigentes. Fija alcance y criterio de aceptación; no congeles una interfaz propuesta sin consumidor.
-2. Mantén el núcleo independiente del proveedor y del transporte, sin efectos al importar. Catálogo cerrado provisto por el consumidor, validación previa de planes y rechazo de entradas desconocidas. No agregues eval, shell, archivos/red arbitrarios, registro dinámico ni acceso implícito a credenciales.
-3. Prueba también límites, fallos parciales y evidencia ambigua. Conserva el estado y la procedencia por paso sin guardar secretos. Para cambios del paquete, prueba el tarball desde un consumidor externo e identifica SHA y run cuando CI esté disponible.
-4. Trabaja en rama y limpia tu entorno temporal sin borrar cambios ajenos. Revisión independiente cuando el impacto lo amerite. Evidencia técnica no autoriza merge, publicación, permisos, secretos ni cambios destructivos. No reutilices excepciones de otros repositorios.
+Librería privada TypeScript/ESM. Hoy el paquete expone sólo un marcador de bootstrap: no hay ejecutor, adaptador MCP ni API estable.
 
-Adaptación local de la [Constitución Agéntica v1.1](https://github.com/fegome90-cmd/constitucion-ai/blob/cdb626e0960e88e3be1ce4a1755f5441a1dbe251/constitution/AGENTIC-CONSTITUTION.md). La fuente no se copia ni se importa como dependencia. El repositorio no declara una licencia pública.
+## Arquitectura
 
-Para commits, PR, verificaciones y merges, sigue [Cómo trabajamos](CONTRIBUTING.md). La CI es evidencia, no autorización.
+- `src/`: núcleo sin dependencias de ejecución, sin I/O al importar y sin acoplamiento a proveedor o transporte. El consumidor suministra un catálogo explícito; el núcleo validará planes acotados y conservará estado y procedencia por paso.
+- Los adaptadores se añaden fuera del núcleo y son opt-in. No ejecutes código o shell arbitrarios, ni concedas acceso implícito a red, archivos, credenciales o herramientas.
+- `scripts/` y `.github/workflows/`: prueba del tarball en un consumidor aislado y controles de secretos y documentación.
+
+## Reglas
+
+- Lee [la hoja de ruta](docs/roadmap.md) antes de modificar contratos. Define alcance y aceptación; no declares implementado lo que sólo está propuesto. No diseñes una API estable sin consumidores.
+- Corre `pnpm typecheck` y `pnpm test`. En un cambio de comportamiento prueba positivos, negativos y fallos parciales. La comparación no puede pasar por dos resultados vacíos salvo que el vacío sea lo esperado y se afirme.
+- Trabaja en rama y sigue [CONTRIBUTING.md](CONTRIBUTING.md) para commits, PR y merge. Evidencia verde no autoriza mezclar ramas, publicar ni cambiar permisos. No reutilices excepciones de otros repositorios.
+- Aplica [SECURITY.md](SECURITY.md). No guardes secretos ni uses evidencia con datos reales para las pruebas iniciales.
+
+Reglas adaptadas de la [Constitución Agéntica v1.1](https://github.com/fegome90-cmd/constitucion-ai/blob/cdb626e0960e88e3be1ce4a1755f5441a1dbe251/constitution/AGENTIC-CONSTITUTION.md), sin copiar sus excepciones ni asignar una licencia pública.

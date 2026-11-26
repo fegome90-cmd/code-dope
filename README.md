@@ -13,3 +13,7 @@ pnpm test
 La prueba construye el paquete, inspecciona el tarball e instala ese archivo en un proyecto aislado para comprobar el import y los tipos. No publica nada.
 
 [Hoja de ruta y fuentes](docs/roadmap.md) · [Normas para agentes](AGENTS.md) · [Flujo de contribución](CONTRIBUTING.md)
+
+[Ancla del proyecto](ANCHOR.yaml) · [Glosario](GLOSSARY.md) · [Seguridad](SECURITY.md)
+
+`pyproject.toml` sólo configura Ruff para scripts Python opcionales; no añade un runtime ni dependencias al paquete. El lockfile del proyecto es `pnpm-lock.yaml`.

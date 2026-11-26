@@ -1,0 +1,17 @@
+# Contexto del proyecto. Las normas operativas viven en AGENTS.md y CONTRIBUTING.md.
+schema_version: 1
+project: code-dope
+goal: Reutilizar la ejecución declarativa de planes en plugins y servidores MCP.
+scope:
+  - Núcleo TypeScript independiente del proveedor y del transporte.
+  - Catálogo explícito, planes acotados y resultados por paso.
+  - Adaptadores opt-in, separados del núcleo.
+not_in_scope:
+  - Ejecución de código arbitrario o registro dinámico de herramientas.
+  - Publicación, credenciales y efectos de red implícitos.
+references:
+  rules: AGENTS.md
+  collaboration: CONTRIBUTING.md
+  roadmap: docs/roadmap.md
+  vocabulary: GLOSSARY.md
+  security: SECURITY.md
