@@ -143,7 +143,7 @@ Reglas comunes a todas las mejoras:
 | El modo inline bloquea el event loop (RESEARCH §5) | Prueba: 0 o muy pocos ticks durante un `for(;;)` inline, como contraparte de H3. |
 | `unwrap` y la rama `toolResult` (L5) | Prueba unitaria de `discovery.ts` con un upstream que devuelve `toolResult`. |
 | Con un heap grande, el GC hace que el timeout llegue antes del error de memoria (§5) | Prueba no frágil: con `memoryLimitBytes` alto y una asignación masiva, `error` matchea `/out of memory|timed out/`. Se documenta como no determinista. |
-| "24× menos `listTools` con 83 herramientas" (ARCHITECTURE) | Buscar el origen. Si no aparece, agregar el caso al bench con 83 herramientas sintéticas y reemplazar la cifra por la medida, o quitarla. |
+| "24× menos `listTools` con 83 herramientas" (ARCHITECTURE) | Origen encontrado: `tests/discovery.test.ts:47` (`bigCatalogServer(80)`, 80 + 3 = 83 herramientas) imprime el ratio y exige ≥ 5×. Medir el ratio real, poner esa cifra en ARCHITECTURE y subir el umbral del test a un valor estable. |
 | El entry raíz de Cloudflare no carga en Node (§2.1) | Prueba: `import("@cloudflare/codemode")` rechaza con `/cloudflare:/`. Avisa si upstream lo arregla. |
 
 **Esfuerzo.** Bajo. Lo hace Opus.
