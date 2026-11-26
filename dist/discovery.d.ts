@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Executor } from "@cloudflare/codemode";
-import { type Isolation } from "./executor/default.ts";
+import type { Isolation } from "./executor/default.ts";
 import type { PooledWorkerExecutorOptions } from "./executor/pool-executor.ts";
 import { type ToolPolicy } from "./policy.ts";
 export interface ToolEntry {
@@ -19,7 +19,7 @@ export interface SearchExecuteOptions {
     executorOptions?: PooledWorkerExecutorOptions;
     /** Default "worker". */
     isolation?: Isolation;
-    /** Max characters returned to the model from `execute`. Default 24_000 (~6k tokens), like Cloudflare. */
+    /** Max characters returned from `execute`, including errors and the truncation marker. Default 24_000. */
     maxResponseChars?: number;
 }
 export declare function createSearchExecuteMcpServer(o: SearchExecuteOptions): Promise<McpServer>;

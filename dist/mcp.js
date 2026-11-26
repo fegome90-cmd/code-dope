@@ -1,11 +1,20 @@
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+/**
+ * MCP adapter: wrap an existing MCP server behind one Code Mode `code` tool,
+ * running in Node with QuickJSExecutor + policy + sandbox helpers.
+ *
+ * Reuses Cloudflare's `codeMcpServer` (@cloudflare/codemode/mcp, MIT), which
+ * handles the public code tool, result unwrapping and response truncation.
+ * The bridge supplies a complete catalog without reconnecting the real upstream;
+ * shared resources own pagination, output validation and lifecycle cleanup.
+ */
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { codeMcpServer } from "@cloudflare/codemode/mcp";
-import { createDefaultExecutor } from "./executor/default.js";
 import { collisions, policyAllows, withPolicy } from "./policy.js";
 import { typesFor } from "./discovery.js";
 import { sanitizeToolName } from "./vendor/cf-utils.js";
 import { HELPERS_DOC } from "./helpers.js";
+import { bindMcpCleanup, closeAll, connectMcpResources } from "./mcp-resources.js";
 export const CODE_TOOL_DESCRIPTION = `Execute JavaScript to achieve a goal in one step, calling several tools programmatically.
 
 Available tools (call as \`await codemode.<tool>(args)\`):
@@ -19,31 +28,27 @@ ${HELPERS_DOC}
 {{example}}`;
 export { createSearchExecuteMcpServer } from "./discovery.js";
 export async function createCodeModeMcpServer(o) {
-    // Discover for the model-facing description, then let the upstream adapter
-    // reconnect and keep its complete function map for policy-enforced denials.
-    const [ct, st] = InMemoryTransport.createLinkedPair();
-    const client = new Client({ name: "code-dope-policy-discovery", version: "0.1.0" });
-    let tools;
+    const resources = await connectMcpResources(o);
+    const { callTool, tools, inner } = resources;
+    // Cloudflare accepts a server, not an existing client. This internal bridge
+    // exposes the complete catalog and keeps the real upstream connected once.
+    const bridge = new McpServer({ name: "code-dope-upstream-bridge", version: "0.1.0" });
+    const cleanup = () => closeAll([() => bridge.close(), resources.close]);
     try {
-        await o.upstream.connect(st);
-        await client.connect(ct);
-        ({ tools } = await client.listTools());
+        bridge.server.registerCapabilities({ tools: {} });
+        bridge.server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools }));
+        bridge.server.setRequestHandler(CallToolRequestSchema, (request, extra) => callTool(request.params, { signal: extra.signal }));
+        const ambiguous = collisions(tools.map((t) => t.name));
+        const visible = tools.filter((t) => !ambiguous.has(t.name) || policyAllows(o.policy, "codemode", t.name, ambiguous));
+        const first = visible[0];
+        const accessor = first && (ambiguous.has(first.name) ? `codemode[${JSON.stringify(first.name)}]` : `codemode.${sanitizeToolName(first.name)}`);
+        const description = (o.description ?? CODE_TOOL_DESCRIPTION)
+            .replaceAll("{{types}}", () => typesFor(visible, ambiguous))
+            .replaceAll("{{example}}", () => accessor ? `Example: async () => ${accessor}({ /* tool arguments */ })` : "");
+        return bindMcpCleanup(await codeMcpServer({ server: bridge, executor: withPolicy(inner, o.policy), description }), cleanup);
     }
-    finally {
-        await client.close();
-        await o.upstream.close();
+    catch (error) {
+        await cleanup().catch(() => { });
+        throw error;
     }
-    const ambiguous = collisions(tools.map((t) => t.name));
-    const visible = tools.filter((t) => !ambiguous.has(t.name) || policyAllows(o.policy, "codemode", t.name, ambiguous));
-    const first = visible[0];
-    const accessor = first && (ambiguous.has(first.name) ? `codemode[${JSON.stringify(first.name)}]` : `codemode.${sanitizeToolName(first.name)}`);
-    const description = (o.description ?? CODE_TOOL_DESCRIPTION)
-        .replaceAll("{{types}}", () => typesFor(visible, ambiguous))
-        .replaceAll("{{example}}", () => accessor ? `Example: async () => ${accessor}({ /* tool arguments */ })` : "");
-    const inner = o.executor ?? createDefaultExecutor(o.isolation, o.executorOptions);
-    return codeMcpServer({
-        server: o.upstream,
-        executor: withPolicy(inner, o.policy),
-        description,
-    });
 }

@@ -104,7 +104,7 @@ Los diseños aprobados siguientes se conservan como especificación; las notas d
    - `files: ["dist", "snippets", "catalog", "THIRD_PARTY_NOTICES.md", "README.md"]`;
    - sin `prepare`.
    En el repo, los tests, examples y bench siguen importando `src/*.ts` por ruta relativa, así que el desarrollo sigue sin build.
-5. **Verificación de deriva:** script `check:dist` (`npm run build && node scripts/check-dist.mjs`) incluido en `test:all`. Si alguien cambia `src/` sin reconstruir, `test:all` falla.
+5. **Verificación de deriva:** script `check:dist` (`npm run build && node scripts/check-dist.mjs`) incluido en `test:all`. Si alguien cambia `src/` sin reconstruir, `test:all` falla. También rechaza archivos generados que no están en el índice, incluso si Git los ignora; la regresión usa un índice temporal real.
 6. `.gitattributes`: `dist/** linguist-generated=true -diff`, para que los diffs y las revisiones de PR no se inflen.
 7. CLAUDE.md:
    - "sin build en desarrollo; después de cambiar `src/` corre `npm run build` y commitea `dist/` (lo verifica `test:all`)";

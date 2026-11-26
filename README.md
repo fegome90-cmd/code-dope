@@ -50,6 +50,8 @@ await server.connect(new StdioServerTransport());
 
 Con catálogos grandes conviene `createSearchExecuteMcpServer`, que expone `search_tools` + `execute` y solo entrega los tipos de las herramientas encontradas.
 
+Ambos adaptadores mantienen una sola conexión con el upstream y leen todas las páginas del catálogo, conservando la validación de `outputSchema` y los requisitos de ejecución por tareas. Un cursor repetido falla durante la construcción. Entrega un upstream todavía sin conectar; si ya tiene una conexión, el adaptador la rechaza y la deja intacta. Al cerrar el adaptador o desconectar su consumidor se cierran su conexión y cualquier pool creado internamente. Un `executor` suministrado por el caller sigue siendo responsabilidad del caller. `await server.close()` espera la limpieza; también se limpia si falla la inicialización.
+
 ### Plugin con herramientas propias (sin MCP)
 
 ```ts
@@ -67,7 +69,6 @@ Ejemplo completo en `examples/plugin-consumer/` (`npm run example:plugin`). Clie
 ```js
 async () => {
   const all = await helpers.paginate((cursor) => codemode.list_orders(cursor == null ? {} : { cursor }));
-  const res = helpers.settle(await helpers.parallel(ids.map((id) => () => codemode.get_customer({ id }))));
   return helpers.summarize(helpers.pick(helpers.where(all.items, { status: "pending" }), ["id", "total"]));
 }
 ```
@@ -77,8 +78,9 @@ async () => {
 - El código del modelo corre en QuickJS-WASM: sin `require`, `process`, `fetch`, fs, timers ni red. Por el puente solo cruzan strings JSON; ningún objeto del host entra al guest. Verificado en `tests/executor.test.ts` y en la revisión independiente.
 - Por defecto (`isolation: "worker"`) cada ejecución usa un worker thread nuevo, con `env` vacío y límite de heap V8. Un bucle de CPU no bloquea el host y un watchdog puede terminar el worker. `isolation: "pool"` reutiliza workers precalentados (p50 2,74 ms en este bench): cada ejecución recibe un runtime y contexto QuickJS nuevos, pero comparte el módulo WASM cargado. El worker se descarta tras **cualquier** ejecución con error y tras `maxUses` (100) usos. Con `prewarm: true`, el reemplazo comienza a calentarse al reciclar; `stats.warming` cuenta los slots todavía sin señal de disponibilidad. El reaping por `idleMs` no crea reemplazos. Los workers ociosos no retienen el proceso; `close()` detiene el pool. `isolation: "inline"` midió p50 2,44 ms, pero un bucle bloquea el event loop hasta el deadline.
 - Límites: timeout de reloj (incluye la espera de herramientas), interrupción de CPU, memoria, stack, logs, llamadas en vuelo y tamaño y profundidad del resultado.
-- La policy envuelve las funciones host **antes** de que el sandbox las vea, así que el código no puede saltarse la allowlist, las aprobaciones, la validación ni el presupuesto. Es fail-closed: una herramienta sin clasificar se deniega, y una escritura sin `approve` también. Sin colisión, los nombres se comparan sanitizados (`delete-user` = `delete_user`). Si coexisten variantes con el mismo sanitizado, `read`, `write` y `validate` requieren el nombre exacto: `"*"` no sustituye esa clasificación explícita. `deny` sigue denegando todas las variantes sanitizadas. Ambos servidores MCP omiten de los tipos y la descripción las variantes que colisionan y no están permitidas; las admitidas se anuncian por su nombre exacto. Un nombre sin proveedor aplica a todos los proveedores; usa `proveedor.tool` para acotarlo. Los hooks reciben una copia de los argumentos. Si una llamada vence por timeout, su efecto puede igual completarse (queda auditada como `outcome: "unknown"`), así que las herramientas de escritura deberían ser idempotentes.
+- La policy envuelve las funciones host **antes** de que el sandbox las vea, así que el código no puede saltarse la allowlist, las aprobaciones, la validación ni el presupuesto. Es fail-closed: una herramienta sin clasificar se deniega, y una escritura sin `approve` también. Sin colisión, los nombres se comparan sanitizados (`delete-user` = `delete_user`). Si coexisten variantes con el mismo sanitizado, `read`, `write` y `validate` requieren el nombre exacto: `"*"` no sustituye esa clasificación explícita. `deny` sigue denegando todas las variantes sanitizadas. Ambos servidores MCP omiten de los tipos y la descripción las variantes que colisionan y no están permitidas; las admitidas se anuncian por su nombre exacto. Un nombre sin punto aplica a todos los proveedores; `proveedor.tool` aplica sólo a ese proveedor en allowlists, deny y validadores. Si el nombre real contiene un punto, usa `proveedor.nombre.con.punto`. Caller, validador y aprobador no pueden mutar la copia privada que recibe la herramienta: cada hook recibe su propia copia. Si una llamada vence por timeout, su efecto puede igual completarse (queda auditada como `outcome: "unknown"`), así que las herramientas de escritura deberían ser idempotentes.
 - `withPolicy` cierra los permisos al terminar `execute`, tanto en inline como en worker y pool: una aprobación tardía no puede iniciar una herramienta. El aprobador recibe `signal`, que se aborta al cierre. Las llamadas que ya empezaron pueden completarse; si su registro se emite después del cierre lleva `afterExecutionEnd: true`. `guardFns` usado por separado no conoce ese ciclo de vida y sus guards permanecen abiertos.
+- Si el sink de auditoría lanza o rechaza una promesa, se conserva el resultado real de la herramienta o la denegación original. El sink debe manejar sus errores de entrega; la biblioteca no garantiza auditoría durable. Los logs guest se entregan con el resultado normal del worker: un crash o una terminación forzada puede perderlos y devolver `logs: []`.
 - Las credenciales viven solo en las funciones host.
 - **Límites:** QuickJS-emscripten no está auditado (lo dice su propio autor). Un worker thread comparte proceso con el host, así que no es un límite de SO. El primer intento de carga sostenida terminó con un **fallo nativo del proceso (`Segmentation fault`, exit 139)**; un segundo intento completó la carga, pero la causa sigue sin determinarse. Para código hostil, ejecuta el servidor además en un proceso o contenedor de bajo privilegio. El texto que devuelven las herramientas puede traer prompt injection: la descripción de la herramienta lo advierte al modelo, pero no se filtra. Evidencia y límites en [RESEARCH.md](RESEARCH.md) §5 y §8 y [bench/SOAK.json](bench/SOAK.json).
 
@@ -121,6 +123,12 @@ Este bench es informativo y queda fuera de `test:all`. El segundo intento comple
 
 Los umbrales son RSS > 1,5× o p95 > 2×. El primer intento terminó con exit 139 antes de emitir una ventana de 500; su número de ejecuciones completadas es desconocido. Las comparaciones de 500 por configuración antes y después de M4 también pasaron, sin identificar la causa del crash. El reintento exitoso no demuestra estabilidad general. Los errores reciclan workers con frecuencia, por lo que esta mezcla tampoco valida 1 000 usos consecutivos exitosos por worker.
 
+La revisión del PR añadió [trazas de ciclo de vida acotadas](bench/POOL-LIFECYCLE.json), reproducibles con `node bench/pool-lifecycle.ts`: reciclaje normal, error recuperable, timeout sintético, fallo de arranque y cierre de un slot reservado. No es otra corrida del soak ni una corrección demostrada del fallo nativo. El pool continúa opt-in. Un fallo de warmup sólo se reintenta por demanda encolada; no crea una cadena de reemplazos ociosos. `close()` espera también los workers reciclados cuya terminación sigue pendiente, y todos sus callers esperan la misma limpieza.
+
+### Resultados parciales y helpers
+
+`guardedBulkUpdate` distingue `applied`, `stopped` y `pending`. `stopped` identifica el objetivo que falló y conserva `outcome: "unknown"` ante timeout; `pending` contiene sólo los objetivos que nunca se intentaron. No reintentes el objetivo detenido sin reconciliar su efecto. `helpers.retry` y el snippet Python nunca reintentan una denegación de policy, incluso con un predicado personalizado. `helpers.batch` exige un tamaño entero positivo y `countBy` conserva claves como `constructor` y `__proto__`.
+
 ## Estructura
 
 ```
@@ -139,4 +147,4 @@ examples/  tests/  bench/
 
 Cómo ampliar: agrega un helper en `src/sandbox/helpers.js` (sin imports ni timers) o una recipe en `src/recipes.ts` (valida identificadores e incrusta parámetros con `JSON.stringify`). Después agrega una prueba y una entrada en `catalog/patterns.json`.
 
-Documentos: [RESEARCH.md](RESEARCH.md) · [ARCHITECTURE.md](ARCHITECTURE.md) · [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+Documentos: [RESEARCH.md](RESEARCH.md) · [ARCHITECTURE.md](ARCHITECTURE.md) · [Revisión del PR #2](docs/PR2-READINESS.md) · [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). La discrepancia de licencia del proyecto está pendiente de decisión del dueño; ver [SECURITY.md](SECURITY.md).

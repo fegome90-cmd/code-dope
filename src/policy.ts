@@ -66,7 +66,7 @@ export interface ToolPolicy {
   callTimeoutMs?: number;
   /** Max characters of a single tool result passed back to the guest. Default 1_000_000. */
   maxResultChars?: number;
-  /** Receives one record per attempted call (allowed or denied). */
+  /** Receives one record per attempted call. Sink failures never change the tool outcome; sinks must handle delivery failures. */
   audit?: (record: AuditRecord) => void;
 }
 
@@ -89,13 +89,13 @@ export function collisions(names: string[]): Set<string> {
 /** Exact allowlist matching for ambiguous names; deny lists always use sanitization. */
 export function matches(list: string[] | undefined, provider: string, tool: string, { exact = false } = {}): boolean {
   if (!list) return false;
-  if (exact) return list.some((e) => e === tool || e === `${provider}.${tool}`);
   const t = sanitizeToolName(tool);
   return list.some((e) => {
-    if (e === "*") return true;
+    if (e === "*") return !exact;
     const dot = e.indexOf(".");
-    if (dot > 0 && e.slice(0, dot) === provider) return sanitizeToolName(e.slice(dot + 1)) === t;
-    return sanitizeToolName(e) === t;
+    if (dot > 0 && e.slice(0, dot) !== provider) return false;
+    const name = dot > 0 ? e.slice(dot + 1) : e;
+    return exact ? name === tool : sanitizeToolName(name) === t;
   });
 }
 
@@ -154,6 +154,11 @@ export function guardFns(provider: string, fns: Fns, policy: ToolPolicy, state: 
   const callTimeoutMs = policy.callTimeoutMs ?? 15_000;
   const maxResultChars = policy.maxResultChars ?? 1_000_000;
   const ambiguous = collisions(Object.keys(fns));
+  const audit = (record: AuditRecord): void => {
+    // A logging outage cannot turn a completed write into a retryable failure,
+    // or replace the original denial. Also contain asynchronous sink rejection.
+    try { void Promise.resolve(policy.audit?.(record)).catch(() => {}); } catch { /* sink-owned delivery failure */ }
+  };
   const out: Fns = {};
   for (const [tool, fn] of Object.entries(fns)) {
     out[tool] = async (args: unknown) => {
@@ -163,7 +168,7 @@ export function guardFns(provider: string, fns: Fns, policy: ToolPolicy, state: 
       const started = Date.now();
       const base = { seq, provider, tool, kind, argsChars: size(args) };
       const deny = (reason: string): never => {
-        policy.audit?.({ ...base, decision: "denied", reason, durationMs: Date.now() - started });
+        audit({ ...base, decision: "denied", reason, durationMs: Date.now() - started });
         throw new PolicyError(`Denied ${provider}.${tool}: ${reason}`);
       };
 
@@ -185,10 +190,11 @@ export function guardFns(provider: string, fns: Fns, policy: ToolPolicy, state: 
           state.calls--;
         }
       };
-      // Hooks get a private copy: they cannot change what the tool receives.
-      let snapshot: unknown;
+      // Snapshot once for execution; neither the caller nor either hook keeps
+      // the object that will reach the tool. Hooks get independent copies.
+      let executionArgs: unknown;
       try {
-        snapshot = args === undefined ? undefined : structuredClone(args);
+        executionArgs = structuredClone(args);
       } catch {
         release();
         deny("arguments are not cloneable");
@@ -197,7 +203,7 @@ export function guardFns(provider: string, fns: Fns, policy: ToolPolicy, state: 
       if (v) {
         let problem: string | undefined;
         try {
-          problem = runValidator(v, snapshot);
+          problem = runValidator(v, structuredClone(executionArgs));
         } catch (e) {
           problem = `validator threw: ${e instanceof Error ? e.message : String(e)}`;
         }
@@ -213,7 +219,7 @@ export function guardFns(provider: string, fns: Fns, policy: ToolPolicy, state: 
         }
         let ok = false;
         try {
-          ok = (await policy.approve!({ provider, tool, args: snapshot, signal: state.abort?.signal })) === true;
+          ok = (await policy.approve!({ provider, tool, args: structuredClone(executionArgs), signal: state.abort?.signal })) === true;
         } catch (e) {
           release();
           deny(`approval hook failed: ${e instanceof Error ? e.message : String(e)}`);
@@ -230,17 +236,17 @@ export function guardFns(provider: string, fns: Fns, policy: ToolPolicy, state: 
       }
       let timedOut = false;
       try {
-        const result = await withTimeout(Promise.resolve(fn(args)), callTimeoutMs, `${provider}.${tool}`, () => {
+        const result = await withTimeout(Promise.resolve(fn(executionArgs)), callTimeoutMs, `${provider}.${tool}`, () => {
           timedOut = true;
         });
         const resultChars = size(result);
         if (resultChars > maxResultChars) {
           throw new PolicyError(`Result of ${provider}.${tool} is ${resultChars} chars (limit ${maxResultChars}); filter or paginate`);
         }
-        policy.audit?.({ ...base, decision: "allowed", ok: true, outcome: "done", durationMs: Date.now() - started, resultChars, ...(state.closed ? { afterExecutionEnd: true } : {}) });
+        audit({ ...base, decision: "allowed", ok: true, outcome: "done", durationMs: Date.now() - started, resultChars, ...(state.closed ? { afterExecutionEnd: true } : {}) });
         return result;
       } catch (e) {
-        policy.audit?.({
+        audit({
           ...base, decision: "allowed", ok: false, outcome: timedOut ? "unknown" : "failed",
           error: e instanceof Error ? e.message : String(e), durationMs: Date.now() - started,
           ...(state.closed ? { afterExecutionEnd: true } : {}),

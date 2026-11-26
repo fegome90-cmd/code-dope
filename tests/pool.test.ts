@@ -2,6 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { PooledWorkerExecutor } from "../src/index.ts";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -140,7 +141,7 @@ test("pool: tool errors reach the guest without recycling when the guest handles
 
 test("pool: an unclosed pool does not keep the process alive and stack overflows stay off stderr", () => {
   const t = Date.now();
-  const r = spawnSync(process.execPath, [new URL("./fixtures/pool-unclosed.ts", import.meta.url).pathname], { encoding: "utf8", timeout: 15_000 });
+  const r = spawnSync(process.execPath, [fileURLToPath(new URL("./fixtures/pool-unclosed.ts", import.meta.url))], { encoding: "utf8", timeout: 15_000 });
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.stdout.trim(), "err 1");
   assert.doesNotMatch(r.stderr, /Aborted|Assertion/);

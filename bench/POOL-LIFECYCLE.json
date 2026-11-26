@@ -1,0 +1,849 @@
+{
+  "recordedAt": "2026-11-26T13:52:15.425Z",
+  "node": "v24.22.3",
+  "status": "PASS",
+  "scope": "Five bounded synthetic functional scenarios with parent-side worker lifecycle events; no native stack trace, real services, or sustained load.",
+  "nativeCrashCause": "NOT_VERIFIED",
+  "nativeStability": "NOT_VERIFIED",
+  "defaultIsolation": "worker",
+  "summaries": [
+    {
+      "scenario": "successful-recycling",
+      "status": "PASS",
+      "stats": {
+        "spawned": 2,
+        "alive": 0,
+        "idle": 0,
+        "busy": 0,
+        "queued": 0,
+        "warming": 0
+      }
+    },
+    {
+      "scenario": "ordinary-guest-error-and-recovery",
+      "status": "PASS",
+      "stats": {
+        "spawned": 2,
+        "alive": 0,
+        "idle": 0,
+        "busy": 0,
+        "queued": 0,
+        "warming": 0
+      }
+    },
+    {
+      "scenario": "synthetic-tool-timeout",
+      "status": "PASS",
+      "stats": {
+        "spawned": 2,
+        "alive": 0,
+        "idle": 0,
+        "busy": 0,
+        "queued": 0,
+        "warming": 0
+      }
+    },
+    {
+      "scenario": "startup-failure-with-bounded-demand",
+      "status": "PASS",
+      "stats": {
+        "spawned": 2,
+        "alive": 0,
+        "idle": 0,
+        "busy": 0,
+        "queued": 0,
+        "warming": 0
+      }
+    },
+    {
+      "scenario": "reserved-slot-close",
+      "status": "PASS",
+      "stats": {
+        "spawned": 1,
+        "alive": 0,
+        "idle": 0,
+        "busy": 0,
+        "queued": 0,
+        "warming": 0
+      }
+    }
+  ],
+  "workersObserved": 9,
+  "events": [
+    {
+      "seq": 1,
+      "ms": 41.751,
+      "scenario": "successful-recycling",
+      "event": "worker:online",
+      "worker": 1
+    },
+    {
+      "seq": 2,
+      "ms": 113.427,
+      "scenario": "successful-recycling",
+      "event": "worker:ready",
+      "worker": 1
+    },
+    {
+      "seq": 3,
+      "ms": 116.675,
+      "scenario": "successful-recycling",
+      "event": "execution:start",
+      "stats": {
+        "spawned": 1,
+        "alive": 1,
+        "idle": 1,
+        "busy": 0,
+        "queued": 0,
+        "warming": 0
+      }
+    },
+    {
+      "seq": 4,
+      "ms": 118.941,
+      "scenario": "successful-recycling",
+      "event": "worker:done",
+      "worker": 1,
+      "job": 1
+    },
+    {
+      "seq": 5,
+      "ms": 119.106,
+      "scenario": "successful-recycling",
+      "event": "execution:end",
+      "stats": {
+        "spawned": 1,
+        "alive": 1,
+        "idle": 1,
+        "busy": 0,
+        "queued": 0,
+        "warming": 0
+      }
+    },
+    {
+      "seq": 6,
+      "ms": 119.149,
+      "scenario": "successful-recycling",
+      "event": "execution:start",
+      "stats": {
+        "spawned": 1,
+        "alive": 1,
+        "idle": 1,
+        "busy": 0,
+        "queued": 0,
+        "warming": 0
+      }
+    },
+    {
+      "seq": 7,
+      "ms": 120.283,
+      "scenario": "successful-recycling",
+      "event": "worker:done",
+      "worker": 1,
+      "job": 2
+    },
+    {
+      "seq": 8,
+      "ms": 120.39,
+      "scenario": "successful-recycling",
+      "event": "terminate:start",
+      "worker": 1
+    },
+    {
+      "seq": 9,
+      "ms": 121.135,
+      "scenario": "successful-recycling",
+      "event": "execution:end",
+      "stats": {
+        "spawned": 2,
+        "alive": 1,
+        "idle": 1,
+        "busy": 0,
+        "queued": 0,
+        "warming": 1
+      }
+    },
+    {
+      "seq": 10,
+      "ms": 122.652,
+      "scenario": "successful-recycling",
+      "event": "worker:exit",
+      "worker": 1,
+      "code": 1
+    },
+    {
+      "seq": 11,
+      "ms": 123.119,
+      "scenario": "successful-recycling",
+      "event": "terminate:end",
+      "worker": 1,
+      "code": 1
+    },
+    {
+      "seq": 12,
+      "ms": 146.962,
+      "scenario": "successful-recycling",
+      "event": "worker:online",
+      "worker": 2
+    },
+    {
+      "seq": 13,
+      "ms": 219.519,
+      "scenario": "successful-recycling",
+      "event": "worker:ready",
+      "worker": 2
+    },
+    {
+      "seq": 14,
+      "ms": 222.631,
+      "scenario": "successful-recycling",
+      "event": "execution:start",
+      "stats": {
+        "spawned": 2,
+        "alive": 1,
+        "idle": 1,
+        "busy": 0,
+        "queued": 0,
+        "warming": 0
+      }
+    },
+    {
+      "seq": 15,
+      "ms": 224.648,
+      "scenario": "successful-recycling",
+      "event": "worker:done",
+      "worker": 2,
+      "job": 3
+    },
+    {
+      "seq": 16,
+      "ms": 224.687,
+      "scenario": "successful-recycling",
+      "event": "execution:end",
+      "stats": {
+        "spawned": 2,
+        "alive": 1,
+        "idle": 1,
+        "busy": 0,
+        "queued": 0,
+        "warming": 0
+      }
+    },
+    {
+      "seq": 17,
+      "ms": 224.787,
+      "scenario": "successful-recycling",
+      "event": "close:start",
+      "stats": {
+        "spawned": 2,
+        "alive": 1,
+        "idle": 1,
+        "busy": 0,
+        "queued": 0,
+        "warming": 0
+      }
+    },
+    {
+      "seq": 18,
+      "ms": 224.906,
+      "scenario": "successful-recycling",
+      "event": "terminate:start",
+      "worker": 2
+    },
+    {
+      "seq": 19,
+      "ms": 226.214,
+      "scenario": "successful-recycling",
+      "event": "worker:exit",
+      "worker": 2,
+      "code": 1
+    },
+    {
+      "seq": 20,
+      "ms": 226.302,
+      "scenario": "successful-recycling",
+      "event": "terminate:end",
+      "worker": 2,
+      "code": 1
+    },
+    {
+      "seq": 21,
+      "ms": 226.368,
+      "scenario": "successful-recycling",
+      "event": "close:end",
+      "stats": {
+        "spawned": 2,
+        "alive": 0,
+        "idle": 0,
+        "busy": 0,
+        "queued": 0,
+        "warming": 0
+      }
+    },
+    {
+      "seq": 22,
+      "ms": 226.712,
+      "scenario": "ordinary-guest-error-and-recovery",
+      "event": "execution:start",
+      "stats": {
+        "spawned": 1,
+        "alive": 1,
+        "idle": 1,
+        "busy": 0,
+        "queued": 0,
+        "warming": 1
+      }
+    },
+    {
+      "seq": 23,
+      "ms": 241.754,
+      "scenario": "ordinary-guest-error-and-recovery",
+      "event": "worker:online",
+      "worker": 3
+    },
+    {
+      "seq": 24,
+      "ms": 282.375,
+      "scenario": "ordinary-guest-error-and-recovery",
+      "event": "worker:ready",
+      "worker": 3
+    },
+    {
+      "seq": 25,
+      "ms": 286.611,
+      "scenario": "ordinary-guest-error-and-recovery",
+      "event": "worker:done",
+      "worker": 3,
+      "job": 1,
+      "error": "CONTROLLED_GUEST_ERROR"
+    },
+    {
+      "seq": 26,
+      "ms": 286.658,
+      "scenario": "ordinary-guest-error-and-recovery",
+      "event": "terminate:start",
+      "worker": 3
+    },
+    {
+      "seq": 27,
+      "ms": 287.234,
+      "scenario": "ordinary-guest-error-and-recovery",
+      "event": "execution:end",
+      "error": "CONTROLLED_GUEST_ERROR",
+      "stats": {
+        "spawned": 2,
+        "alive": 1,
+        "idle": 1,
+        "busy": 0,
+        "queued": 0,
+        "warming": 1
+      }
+    },
+    {
+      "seq": 28,
+      "ms": 287.403,
+      "scenario": "ordinary-guest-error-and-recovery",
+      "event": "execution:start",
+      "stats": {
+        "spawned": 2,
+        "alive": 1,
+        "idle": 1,
+        "busy": 0,
+        "queued": 0,
+        "warming": 1
+      }
+    },
+    {
+      "seq": 29,
+      "ms": 288.032,
+      "scenario": "ordinary-guest-error-and-recovery",
+      "event": "worker:exit",
+      "worker": 3,
+      "code": 1
+    },
+    {
+      "seq": 30,
+      "ms": 288.14,
+      "scenario": "ordinary-guest-error-and-recovery",
+      "event": "terminate:end",
+      "worker": 3,
+      "code": 1
+    },
+    {
+      "seq": 31,
+      "ms": 303.769,
+      "scenario": "ordinary-guest-error-and-recovery",
+      "event": "worker:online",
+      "worker": 4
+    },
+    {
+      "seq": 32,
+      "ms": 344.941,
+      "scenario": "ordinary-guest-error-and-recovery",
+      "event": "worker:ready",
+      "worker": 4
+    },
+    {
+      "seq": 33,
+      "ms": 348.093,
+      "scenario": "ordinary-guest-error-and-recovery",
+      "event": "worker:done",
+      "worker": 4,
+      "job": 2
+    },
+    {
+      "seq": 34,
+      "ms": 348.154,
+      "scenario": "ordinary-guest-error-and-recovery",
+      "event": "execution:end",
+      "stats": {
+        "spawned": 2,
+        "alive": 1,
+        "idle": 1,
+        "busy": 0,
+        "queued": 0,
+        "warming": 0
+      }
+    },
+    {
+      "seq": 35,
+      "ms": 348.162,
+      "scenario": "ordinary-guest-error-and-recovery",
+      "event": "close:start",
+      "stats": {
+        "spawned": 2,
+        "alive": 1,
+        "idle": 1,
+        "busy": 0,
+        "queued": 0,
+        "warming": 0
+      }
+    },
+    {
+      "seq": 36,
+      "ms": 348.178,
+      "scenario": "ordinary-guest-error-and-recovery",
+      "event": "terminate:start",
+      "worker": 4
+    },
+    {
+      "seq": 37,
+      "ms": 349.478,
+      "scenario": "ordinary-guest-error-and-recovery",
+      "event": "worker:exit",
+      "worker": 4,
+      "code": 1
+    },
+    {
+      "seq": 38,
+      "ms": 349.552,
+      "scenario": "ordinary-guest-error-and-recovery",
+      "event": "terminate:end",
+      "worker": 4,
+      "code": 1
+    },
+    {
+      "seq": 39,
+      "ms": 349.562,
+      "scenario": "ordinary-guest-error-and-recovery",
+      "event": "close:end",
+      "stats": {
+        "spawned": 2,
+        "alive": 0,
+        "idle": 0,
+        "busy": 0,
+        "queued": 0,
+        "warming": 0
+      }
+    },
+    {
+      "seq": 40,
+      "ms": 367.93,
+      "scenario": "synthetic-tool-timeout",
+      "event": "worker:online",
+      "worker": 5
+    },
+    {
+      "seq": 41,
+      "ms": 407.017,
+      "scenario": "synthetic-tool-timeout",
+      "event": "worker:ready",
+      "worker": 5
+    },
+    {
+      "seq": 42,
+      "ms": 412.138,
+      "scenario": "synthetic-tool-timeout",
+      "event": "execution:start",
+      "stats": {
+        "spawned": 1,
+        "alive": 1,
+        "idle": 1,
+        "busy": 0,
+        "queued": 0,
+        "warming": 0
+      }
+    },
+    {
+      "seq": 43,
+      "ms": 513.778,
+      "scenario": "synthetic-tool-timeout",
+      "event": "worker:done",
+      "worker": 5,
+      "job": 1,
+      "error": "Execution timed out after 100ms"
+    },
+    {
+      "seq": 44,
+      "ms": 513.847,
+      "scenario": "synthetic-tool-timeout",
+      "event": "terminate:start",
+      "worker": 5
+    },
+    {
+      "seq": 45,
+      "ms": 514.44,
+      "scenario": "synthetic-tool-timeout",
+      "event": "execution:end",
+      "error": "Execution timed out after 100ms",
+      "stats": {
+        "spawned": 2,
+        "alive": 1,
+        "idle": 1,
+        "busy": 0,
+        "queued": 0,
+        "warming": 1
+      }
+    },
+    {
+      "seq": 46,
+      "ms": 514.466,
+      "scenario": "synthetic-tool-timeout",
+      "event": "close:start",
+      "stats": {
+        "spawned": 2,
+        "alive": 1,
+        "idle": 1,
+        "busy": 0,
+        "queued": 0,
+        "warming": 1
+      }
+    },
+    {
+      "seq": 47,
+      "ms": 514.499,
+      "scenario": "synthetic-tool-timeout",
+      "event": "terminate:start",
+      "worker": 6
+    },
+    {
+      "seq": 48,
+      "ms": 515.646,
+      "scenario": "synthetic-tool-timeout",
+      "event": "worker:exit",
+      "worker": 5,
+      "code": 1
+    },
+    {
+      "seq": 49,
+      "ms": 515.761,
+      "scenario": "synthetic-tool-timeout",
+      "event": "terminate:end",
+      "worker": 5,
+      "code": 1
+    },
+    {
+      "seq": 50,
+      "ms": 518.513,
+      "scenario": "synthetic-tool-timeout",
+      "event": "worker:exit",
+      "worker": 6,
+      "code": 0
+    },
+    {
+      "seq": 51,
+      "ms": 518.569,
+      "scenario": "synthetic-tool-timeout",
+      "event": "terminate:end",
+      "worker": 6,
+      "code": 0
+    },
+    {
+      "seq": 52,
+      "ms": 518.579,
+      "scenario": "synthetic-tool-timeout",
+      "event": "close:end",
+      "stats": {
+        "spawned": 2,
+        "alive": 0,
+        "idle": 0,
+        "busy": 0,
+        "queued": 0,
+        "warming": 0
+      }
+    },
+    {
+      "seq": 53,
+      "ms": 533.975,
+      "scenario": "startup-failure-with-bounded-demand",
+      "event": "worker:online",
+      "worker": 7
+    },
+    {
+      "seq": 54,
+      "ms": 569.486,
+      "scenario": "startup-failure-with-bounded-demand",
+      "event": "worker:failed",
+      "worker": 7,
+      "error": "Prelude failed: CONTROLLED_STARTUP_FAILURE"
+    },
+    {
+      "seq": 55,
+      "ms": 569.523,
+      "scenario": "startup-failure-with-bounded-demand",
+      "event": "terminate:start",
+      "worker": 7
+    },
+    {
+      "seq": 56,
+      "ms": 570.733,
+      "scenario": "startup-failure-with-bounded-demand",
+      "event": "worker:exit",
+      "worker": 7,
+      "code": 1
+    },
+    {
+      "seq": 57,
+      "ms": 570.822,
+      "scenario": "startup-failure-with-bounded-demand",
+      "event": "terminate:end",
+      "worker": 7,
+      "code": 1
+    },
+    {
+      "seq": 58,
+      "ms": 671.133,
+      "scenario": "startup-failure-with-bounded-demand",
+      "event": "execution:start",
+      "stats": {
+        "spawned": 1,
+        "alive": 0,
+        "idle": 0,
+        "busy": 0,
+        "queued": 0,
+        "warming": 0
+      }
+    },
+    {
+      "seq": 59,
+      "ms": 688.25,
+      "scenario": "startup-failure-with-bounded-demand",
+      "event": "worker:online",
+      "worker": 8
+    },
+    {
+      "seq": 60,
+      "ms": 726.071,
+      "scenario": "startup-failure-with-bounded-demand",
+      "event": "worker:failed",
+      "worker": 8,
+      "error": "Prelude failed: CONTROLLED_STARTUP_FAILURE"
+    },
+    {
+      "seq": 61,
+      "ms": 726.218,
+      "scenario": "startup-failure-with-bounded-demand",
+      "event": "terminate:start",
+      "worker": 8
+    },
+    {
+      "seq": 62,
+      "ms": 726.292,
+      "scenario": "startup-failure-with-bounded-demand",
+      "event": "execution:end",
+      "error": "Sandbox worker failed to start: Prelude failed: CONTROLLED_STARTUP_FAILURE",
+      "stats": {
+        "spawned": 2,
+        "alive": 0,
+        "idle": 0,
+        "busy": 0,
+        "queued": 0,
+        "warming": 0
+      }
+    },
+    {
+      "seq": 63,
+      "ms": 727.821,
+      "scenario": "startup-failure-with-bounded-demand",
+      "event": "worker:exit",
+      "worker": 8,
+      "code": 1
+    },
+    {
+      "seq": 64,
+      "ms": 727.944,
+      "scenario": "startup-failure-with-bounded-demand",
+      "event": "terminate:end",
+      "worker": 8,
+      "code": 1
+    },
+    {
+      "seq": 65,
+      "ms": 827.154,
+      "scenario": "startup-failure-with-bounded-demand",
+      "event": "close:start",
+      "stats": {
+        "spawned": 2,
+        "alive": 0,
+        "idle": 0,
+        "busy": 0,
+        "queued": 0,
+        "warming": 0
+      }
+    },
+    {
+      "seq": 66,
+      "ms": 827.179,
+      "scenario": "startup-failure-with-bounded-demand",
+      "event": "close:end",
+      "stats": {
+        "spawned": 2,
+        "alive": 0,
+        "idle": 0,
+        "busy": 0,
+        "queued": 0,
+        "warming": 0
+      }
+    },
+    {
+      "seq": 67,
+      "ms": 827.755,
+      "scenario": "reserved-slot-close",
+      "event": "execution:start",
+      "stats": {
+        "spawned": 1,
+        "alive": 1,
+        "idle": 1,
+        "busy": 0,
+        "queued": 0,
+        "warming": 1
+      }
+    },
+    {
+      "seq": 68,
+      "ms": 842.751,
+      "scenario": "reserved-slot-close",
+      "event": "worker:online",
+      "worker": 9
+    },
+    {
+      "seq": 69,
+      "ms": 881.04,
+      "scenario": "reserved-slot-close",
+      "event": "worker:ready",
+      "worker": 9
+    },
+    {
+      "seq": 70,
+      "ms": 884.745,
+      "scenario": "reserved-slot-close",
+      "event": "worker:done",
+      "worker": 9,
+      "job": 1
+    },
+    {
+      "seq": 71,
+      "ms": 884.807,
+      "scenario": "reserved-slot-close",
+      "event": "execution:end",
+      "stats": {
+        "spawned": 1,
+        "alive": 1,
+        "idle": 1,
+        "busy": 0,
+        "queued": 0,
+        "warming": 0
+      }
+    },
+    {
+      "seq": 72,
+      "ms": 884.815,
+      "scenario": "reserved-slot-close",
+      "event": "execution:start",
+      "stats": {
+        "spawned": 1,
+        "alive": 1,
+        "idle": 1,
+        "busy": 0,
+        "queued": 0,
+        "warming": 0
+      }
+    },
+    {
+      "seq": 73,
+      "ms": 884.86,
+      "scenario": "reserved-slot-close",
+      "event": "close:start",
+      "stats": {
+        "spawned": 1,
+        "alive": 1,
+        "idle": 0,
+        "busy": 1,
+        "queued": 0,
+        "warming": 0
+      }
+    },
+    {
+      "seq": 74,
+      "ms": 884.874,
+      "scenario": "reserved-slot-close",
+      "event": "terminate:start",
+      "worker": 9
+    },
+    {
+      "seq": 75,
+      "ms": 884.993,
+      "scenario": "reserved-slot-close",
+      "event": "execution:end",
+      "error": "Executor pool closed",
+      "stats": {
+        "spawned": 1,
+        "alive": 0,
+        "idle": 0,
+        "busy": 0,
+        "queued": 0,
+        "warming": 0
+      }
+    },
+    {
+      "seq": 76,
+      "ms": 886.494,
+      "scenario": "reserved-slot-close",
+      "event": "worker:exit",
+      "worker": 9,
+      "code": 1
+    },
+    {
+      "seq": 77,
+      "ms": 886.571,
+      "scenario": "reserved-slot-close",
+      "event": "terminate:end",
+      "worker": 9,
+      "code": 1
+    },
+    {
+      "seq": 78,
+      "ms": 886.603,
+      "scenario": "reserved-slot-close",
+      "event": "close:end",
+      "stats": {
+        "spawned": 1,
+        "alive": 0,
+        "idle": 0,
+        "busy": 0,
+        "queued": 0,
+        "warming": 0
+      }
+    }
+  ]
+}

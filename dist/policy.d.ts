@@ -65,7 +65,7 @@ export interface ToolPolicy {
     callTimeoutMs?: number;
     /** Max characters of a single tool result passed back to the guest. Default 1_000_000. */
     maxResultChars?: number;
-    /** Receives one record per attempted call (allowed or denied). */
+    /** Receives one record per attempted call. Sink failures never change the tool outcome; sinks must handle delivery failures. */
     audit?: (record: AuditRecord) => void;
 }
 export declare class PolicyError extends Error {

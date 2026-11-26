@@ -36,9 +36,12 @@ async def paginate(fetch_page, items="items", next_key="next", max_pages=20):
     for pages in range(1, max_pages + 1):
         page = await fetch_page(cursor)
         out.extend((page or {}).get(items) or [])
-        cursor = (page or {}).get(next_key)
-        if cursor in (None, ""):
+        next_cursor = (page or {}).get(next_key)
+        if next_cursor in (None, ""):
             return {"items": out, "pages": pages, "truncated": False}
+        if next_cursor == cursor:
+            return {"items": out, "pages": pages, "truncated": True, "stalled": True}
+        cursor = next_cursor
     return {"items": out, "pages": max_pages, "truncated": True}
 
 
@@ -49,18 +52,21 @@ async def retry(fn, attempts=3):
         try:
             return await fn()
         except Exception as e:  # noqa: BLE001
+            if str(e).startswith("Denied "):
+                raise
             last = e
     raise last
 
 
 def pick(value, fields):
+    missing = object()
     def one(o):
         r = {}
         for f in fields:
             v = o
             for part in f.split("."):
-                v = v.get(part) if isinstance(v, dict) else None
-            if v is not None:
+                v = v.get(part, missing) if isinstance(v, dict) else missing
+            if v is not missing:
                 r[f] = v
         return r
     return [one(o) for o in value] if isinstance(value, list) else one(value)

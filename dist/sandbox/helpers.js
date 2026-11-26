@@ -54,6 +54,7 @@ globalThis.helpers = (() => {
 
   /** Process items in chunks of `size` sequentially; fn(chunk, index) per chunk. */
   async function batch(items, size, fn) {
+    if (!Number.isInteger(size) || size <= 0) throw new Error("batch size must be a positive integer");
     const out = [];
     for (let i = 0; i < items.length; i += size) out.push(await fn(items.slice(i, i + size), i / size));
     return out;
@@ -63,14 +64,14 @@ globalThis.helpers = (() => {
   async function retry(fn, opts = {}) {
     const attempts = Math.max(1, opts.attempts ?? 3);
     const isDenial = (e) => /^Denied /.test(String((e && e.message) || e));
-    const retryIf = opts.retryIf ?? ((e) => !isDenial(e));
+    const retryIf = opts.retryIf ?? (() => true);
     let last;
     for (let i = 0; i < attempts; i++) {
       try {
         return await fn(i);
       } catch (e) {
         last = e;
-        if (!retryIf(e)) break;
+        if (isDenial(e) || !retryIf(e)) break;
       }
     }
     throw last;
@@ -110,7 +111,7 @@ globalThis.helpers = (() => {
 
   /** Group and count by a field. */
   function countBy(items, field) {
-    const r = {};
+    const r = Object.create(null);
     for (const it of items) {
       const k = String(it[field]);
       r[k] = (r[k] || 0) + 1;

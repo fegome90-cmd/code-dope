@@ -31,7 +31,7 @@ const toolEntries = [
   { name: "archive_note", description: "Archive a note (side effect).", inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] } },
 ];
 
-// --- Code Mode wiring: ~15 lines --------------------------------------------
+// --- Code Mode wiring -----------------------------------------------------
 export function createPlugin(opts: { approveWrites: (tool: string, args: unknown) => boolean }) {
   const runner = createCodeRunner({
     tools: { notes: notesTools },
@@ -50,12 +50,27 @@ export function createPlugin(opts: { approveWrites: (tool: string, args: unknown
       {
         name: "notes_code",
         description: `Run JavaScript over the notes tools (namespace \`notes\`).\n${typesFor(toolEntries).replaceAll("codemode", "notes")}\n${HELPERS_DOC}`,
-        inputSchema: { type: "object", properties: { code: { type: "string" }, recipe: { type: "string" }, params: { type: "object" } } },
+        inputSchema: {
+          type: "object",
+          properties: { code: { type: "string", minLength: 1 }, recipe: { type: "string", enum: Object.keys(RECIPES) }, params: { type: "object" } },
+          oneOf: [{ required: ["code"], not: { required: ["recipe"] } }, { required: ["recipe"], not: { required: ["code"] } }],
+          additionalProperties: false,
+        },
         /** Accepts either model-written code or a library recipe id + params. */
         async handler(input: { code?: string; recipe?: keyof typeof RECIPES; params?: Record<string, unknown> }) {
-          const code = input.code ?? (RECIPES[input.recipe!] as { build(p: unknown): string }).build({ namespace: "notes", ...input.params });
-          const r = await runner.run(code);
-          return r.error ? { isError: true, text: r.error, audit: r.audit } : { isError: false, text: JSON.stringify(r.result), audit: r.audit };
+          try {
+            if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("Input must be an object");
+            const hasCode = input.code !== undefined, hasRecipe = input.recipe !== undefined;
+            if (hasCode === hasRecipe) throw new Error("Provide exactly one of code or a known recipe");
+            if (hasCode && (typeof input.code !== "string" || !input.code.length)) throw new Error("code must be a nonempty string");
+            if (hasRecipe && (typeof input.recipe !== "string" || !Object.hasOwn(RECIPES, input.recipe))) throw new Error("Unknown recipe");
+            if (input.params !== undefined && (!input.params || typeof input.params !== "object" || Array.isArray(input.params))) throw new Error("params must be an object");
+            const code = input.code ?? (RECIPES[input.recipe!] as { build(p: unknown): string }).build({ namespace: "notes", ...input.params });
+            const r = await runner.run(code);
+            return r.error ? { isError: true, text: r.error, audit: r.audit } : { isError: false, text: JSON.stringify(r.result), audit: r.audit };
+          } catch (error) {
+            return { isError: true, text: error instanceof Error ? error.message : String(error), audit: [] };
+          }
         },
       },
     ],

@@ -21,6 +21,33 @@ async def get_customer(params):
 
 
 class PtcHelpersTest(unittest.TestCase):
+    def test_pick_preserves_null_and_omits_missing_paths(self):
+        value = {"total": None, "nested": {"value": None}, "empty": None}
+        self.assertEqual(pick(value, ["total", "missing", "nested.value", "empty.value"]), {"total": None, "nested.value": None})
+        self.assertEqual(pick([value, {}], ["total"]), [{"total": None}, {}])
+
+    def test_pagination_stops_before_requesting_a_repeated_cursor(self):
+        cursors = []
+        async def page(cursor):
+            cursors.append(cursor)
+            return {"items": [len(cursors)], "next": "a"}
+        result = asyncio.run(paginate(page))
+        self.assertEqual(cursors, [None, "a"])
+        self.assertEqual(result, {"items": [1, 2], "pages": 2, "truncated": True, "stalled": True})
+        for terminal in [None, ""]:
+            async def last(_cursor):
+                return {"items": [7], "next": terminal}
+            self.assertEqual(asyncio.run(paginate(last)), {"items": [7], "pages": 1, "truncated": False})
+
+    def test_retry_never_repeats_policy_denials(self):
+        attempts = []
+        async def denied():
+            attempts.append(1)
+            raise RuntimeError("Denied read_orders")
+        with self.assertRaisesRegex(RuntimeError, "Denied read_orders"):
+            asyncio.run(retry(denied, attempts=4))
+        self.assertEqual(len(attempts), 1)
+
     def test_paginate_filter_pick(self):
         async def _run():
             res = await paginate(lambda c: _fetch(c))

@@ -17,16 +17,15 @@ export function collisions(names) {
 export function matches(list, provider, tool, { exact = false } = {}) {
     if (!list)
         return false;
-    if (exact)
-        return list.some((e) => e === tool || e === `${provider}.${tool}`);
     const t = sanitizeToolName(tool);
     return list.some((e) => {
         if (e === "*")
-            return true;
+            return !exact;
         const dot = e.indexOf(".");
-        if (dot > 0 && e.slice(0, dot) === provider)
-            return sanitizeToolName(e.slice(dot + 1)) === t;
-        return sanitizeToolName(e) === t;
+        if (dot > 0 && e.slice(0, dot) !== provider)
+            return false;
+        const name = dot > 0 ? e.slice(dot + 1) : e;
+        return exact ? name === tool : sanitizeToolName(name) === t;
     });
 }
 function findValidator(p, provider, tool, exact) {
@@ -82,6 +81,14 @@ export function guardFns(provider, fns, policy, state = { calls: 0, seq: 0, clos
     const callTimeoutMs = policy.callTimeoutMs ?? 15_000;
     const maxResultChars = policy.maxResultChars ?? 1_000_000;
     const ambiguous = collisions(Object.keys(fns));
+    const audit = (record) => {
+        // A logging outage cannot turn a completed write into a retryable failure,
+        // or replace the original denial. Also contain asynchronous sink rejection.
+        try {
+            void Promise.resolve(policy.audit?.(record)).catch(() => { });
+        }
+        catch { /* sink-owned delivery failure */ }
+    };
     const out = {};
     for (const [tool, fn] of Object.entries(fns)) {
         out[tool] = async (args) => {
@@ -91,7 +98,7 @@ export function guardFns(provider, fns, policy, state = { calls: 0, seq: 0, clos
             const started = Date.now();
             const base = { seq, provider, tool, kind, argsChars: size(args) };
             const deny = (reason) => {
-                policy.audit?.({ ...base, decision: "denied", reason, durationMs: Date.now() - started });
+                audit({ ...base, decision: "denied", reason, durationMs: Date.now() - started });
                 throw new PolicyError(`Denied ${provider}.${tool}: ${reason}`);
             };
             if (state.closed)
@@ -115,10 +122,11 @@ export function guardFns(provider, fns, policy, state = { calls: 0, seq: 0, clos
                     state.calls--;
                 }
             };
-            // Hooks get a private copy: they cannot change what the tool receives.
-            let snapshot;
+            // Snapshot once for execution; neither the caller nor either hook keeps
+            // the object that will reach the tool. Hooks get independent copies.
+            let executionArgs;
             try {
-                snapshot = args === undefined ? undefined : structuredClone(args);
+                executionArgs = structuredClone(args);
             }
             catch {
                 release();
@@ -128,7 +136,7 @@ export function guardFns(provider, fns, policy, state = { calls: 0, seq: 0, clos
             if (v) {
                 let problem;
                 try {
-                    problem = runValidator(v, snapshot);
+                    problem = runValidator(v, structuredClone(executionArgs));
                 }
                 catch (e) {
                     problem = `validator threw: ${e instanceof Error ? e.message : String(e)}`;
@@ -145,7 +153,7 @@ export function guardFns(provider, fns, policy, state = { calls: 0, seq: 0, clos
                 }
                 let ok = false;
                 try {
-                    ok = (await policy.approve({ provider, tool, args: snapshot, signal: state.abort?.signal })) === true;
+                    ok = (await policy.approve({ provider, tool, args: structuredClone(executionArgs), signal: state.abort?.signal })) === true;
                 }
                 catch (e) {
                     release();
@@ -162,18 +170,18 @@ export function guardFns(provider, fns, policy, state = { calls: 0, seq: 0, clos
             }
             let timedOut = false;
             try {
-                const result = await withTimeout(Promise.resolve(fn(args)), callTimeoutMs, `${provider}.${tool}`, () => {
+                const result = await withTimeout(Promise.resolve(fn(executionArgs)), callTimeoutMs, `${provider}.${tool}`, () => {
                     timedOut = true;
                 });
                 const resultChars = size(result);
                 if (resultChars > maxResultChars) {
                     throw new PolicyError(`Result of ${provider}.${tool} is ${resultChars} chars (limit ${maxResultChars}); filter or paginate`);
                 }
-                policy.audit?.({ ...base, decision: "allowed", ok: true, outcome: "done", durationMs: Date.now() - started, resultChars, ...(state.closed ? { afterExecutionEnd: true } : {}) });
+                audit({ ...base, decision: "allowed", ok: true, outcome: "done", durationMs: Date.now() - started, resultChars, ...(state.closed ? { afterExecutionEnd: true } : {}) });
                 return result;
             }
             catch (e) {
-                policy.audit?.({
+                audit({
                     ...base, decision: "allowed", ok: false, outcome: timedOut ? "unknown" : "failed",
                     error: e instanceof Error ? e.message : String(e), durationMs: Date.now() - started,
                     ...(state.closed ? { afterExecutionEnd: true } : {}),

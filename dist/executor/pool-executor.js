@@ -29,6 +29,8 @@ export class PooledWorkerExecutor {
     #slots = new Set();
     #idle = [];
     #queue = [];
+    #terminating = new Set();
+    #closing;
     #spawned = 0;
     #nextJob = 0;
     #closed = false;
@@ -65,13 +67,21 @@ export class PooledWorkerExecutor {
         return this.#acquire().then((slot) => (slot ? this.#run(slot, code, providers) : { result: undefined, error: "Executor pool is closed", logs: [] }));
     }
     /** Terminates every worker. In-flight and queued executions resolve with an error. Idempotent. */
-    async close() {
-        if (this.#closed)
-            return;
+    close() {
+        if (this.#closing)
+            return this.#closing;
         this.#closed = true;
         for (const w of this.#queue.splice(0))
             w(null);
-        await Promise.all([...this.#slots].map((s) => this.#destroy(s, "Executor pool closed")));
+        const destroying = [...this.#slots].map((s) => this.#destroy(s, "Executor pool closed"));
+        // Recycled slots leave #slots before their native threads have terminated.
+        // Every caller of close must wait for those terminations as well.
+        this.#closing = Promise.allSettled([...destroying, ...this.#terminating]).then((results) => {
+            const failed = results.find((r) => r.status === "rejected");
+            if (failed?.status === "rejected")
+                throw failed.reason;
+        });
+        return this.#closing;
     }
     #spawn() {
         const worker = new Worker(WORKER_ENTRY, {
@@ -86,6 +96,8 @@ export class PooledWorkerExecutor {
         const slot = { worker, uses: 0, isReady: false, ready: new Promise((r) => (markReady = r)), dead: false };
         this.#slots.add(slot);
         worker.on("message", (m) => {
+            if (slot.dead)
+                return;
             if (m.type === "ready") {
                 slot.isReady = true;
                 markReady(null);
@@ -152,16 +164,28 @@ export class PooledWorkerExecutor {
         if (slot.dead)
             return;
         slot.dead = true;
+        slot.deathReason = reason;
         this.#forget(slot);
         slot.onDead?.(reason);
         const terminated = slot.worker.terminate();
-        if (!this.#closed && this.#prewarm && reason !== "idle" && this.#slots.size < this.#size)
+        this.#terminating.add(terminated);
+        // A failed warm-up is retried only for queued demand. Repeating background
+        // warm-up with the same invalid configuration would create an endless loop.
+        if (!this.#closed && this.#prewarm && slot.isReady && reason !== "idle" && this.#slots.size < this.#size)
             this.#park(this.#spawn());
         else
             this.#refill();
-        await terminated;
+        try {
+            await terminated;
+        }
+        finally {
+            this.#terminating.delete(terminated);
+        }
     }
     #run(slot, code, providers) {
+        if (this.#closed || slot.dead) {
+            return Promise.resolve({ result: undefined, error: slot.deathReason ?? "Executor pool is closed", logs: [] });
+        }
         const job = ++this.#nextJob;
         const byName = new Map(providers.map((p) => [p.name, p.fns]));
         return new Promise((resolve) => {

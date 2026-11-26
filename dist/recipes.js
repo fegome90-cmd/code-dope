@@ -84,8 +84,10 @@ export const guardedBulkUpdate = {
       await ${ns}.${update}({ ...${J(p.patch)}, [${J(p.idArg)}]: id });
       applied.push(id);
     } catch (e) {
-      ev.step("stopped", { id, error: String(e.message || e) });
-      return helpers.result({ applied, pending: targets.slice(applied.length) }, { ok: false, evidence: ev.steps });
+      const error = String(e.message || e);
+      const stopped = { id, error, outcome: /timed out|timeout/i.test(error) ? "unknown" : "failed" };
+      ev.step("stopped", stopped);
+      return helpers.result({ applied, stopped, pending: targets.slice(applied.length + 1) }, { ok: false, evidence: ev.steps });
     }
   }
   ev.step("applied", { count: applied.length });
