@@ -63,7 +63,8 @@ function walkFiles(rootDir, relDir) {
       a.name.localeCompare(b.name, "en"),
     );
     for (const entry of entries) {
-      if (IGNORED_DIRS.has(entry.name) || IGNORED_FILES.has(entry.name)) continue;
+      if (IGNORED_DIRS.has(entry.name) || IGNORED_FILES.has(entry.name))
+        continue;
       if (entry.name.endsWith(".pyc")) continue;
       const nextAbs = join(absDir, entry.name);
       const nextRel = posix.join(currentRel, entry.name);
@@ -93,7 +94,9 @@ function escapeXml(value) {
 }
 
 function formatNumber(n) {
-  return typeof n === "number" && Number.isFinite(n) ? n.toLocaleString("en-US") : String(n);
+  return typeof n === "number" && Number.isFinite(n)
+    ? n.toLocaleString("en-US")
+    : String(n);
 }
 
 const GIT_LOG_FORMAT = "%h%x1f%cs%x1f%s%x1f%B%x1e";
@@ -110,7 +113,8 @@ export function parseGitLogRecords(raw, limit = 5) {
   for (const record of raw.split("\x1e")) {
     const trimmedRecord = record.trim();
     if (!trimmedRecord) continue;
-    const [sha = "", date = "", subject = "", ...bodyParts] = trimmedRecord.split("\x1f");
+    const [sha = "", date = "", subject = "", ...bodyParts] =
+      trimmedRecord.split("\x1f");
     const cleanSha = sha.trim();
     const cleanDate = date.trim();
     const cleanSubject = subject.trim();
@@ -134,15 +138,28 @@ export function collectRepoState(root) {
   const testFiles = walkFiles(root, "tests");
   const scriptFiles = walkFiles(root, "scripts");
 
-  const logRaw = runGit(root, ["log", "-n", "50", `--format=${GIT_LOG_FORMAT}`]);
+  const logRaw = runGit(root, [
+    "log",
+    "-n",
+    "50",
+    `--format=${GIT_LOG_FORMAT}`,
+  ]);
   const headRecords = parseGitLogRecords(logRaw, 1);
   const headSha = headRecords[0]?.sha || "0000000";
   const headDate = headRecords[0]?.date || "unknown";
 
-  const mergesRaw = runGit(root, ["log", "--merges", "-n", "50", `--format=${GIT_LOG_FORMAT}`]);
+  const mergesRaw = runGit(root, [
+    "log",
+    "--merges",
+    "-n",
+    "50",
+    `--format=${GIT_LOG_FORMAT}`,
+  ]);
   const mergeRows = parseGitLogRecords(mergesRaw, 5);
   const usingFallbackCommits = mergeRows.length === 0;
-  const commitRows = usingFallbackCommits ? parseGitLogRecords(logRaw, 5) : mergeRows;
+  const commitRows = usingFallbackCommits
+    ? parseGitLogRecords(logRaw, 5)
+    : mergeRows;
 
   const hasCoreLibrary =
     srcFiles.includes("src/policy.ts") ||
@@ -180,8 +197,19 @@ export function collectRepoState(root) {
 }
 
 export function renderStatusBlock(state) {
-  const { pkg, nodeTarget, srcFiles, exampleFiles, snippetFiles, testFiles, scriptFiles, headSha, headDate, hasCoreLibrary, hasBootstrapSrc } =
-    state;
+  const {
+    pkg,
+    nodeTarget,
+    srcFiles,
+    exampleFiles,
+    snippetFiles,
+    testFiles,
+    scriptFiles,
+    headSha,
+    headDate,
+    hasCoreLibrary,
+    hasBootstrapSrc,
+  } = state;
 
   const branchRelease =
     !pkg && srcFiles.length === 0
@@ -218,20 +246,34 @@ function summarizeFileList(files, limit = 6) {
 
 export function renderModulesBlock(state) {
   const areas = [
-    { name: "`src/`", files: state.srcFiles, pendingNote: "Pending merge (`PR #2 feat/code-mode-library`)" },
-    { name: "`examples/`", files: state.exampleFiles, pendingNote: "Pending merge (`PR #2 feat/code-mode-library`)" },
-    { name: "`snippets/`", files: state.snippetFiles, pendingNote: "Pending merge (`PR #2 feat/code-mode-library`)" },
-    { name: "`scripts/`", files: state.scriptFiles, pendingNote: "No scripts found" },
+    {
+      name: "`src/`",
+      files: state.srcFiles,
+      pendingNote: "Pending merge (`PR #2 feat/code-mode-library`)",
+    },
+    {
+      name: "`examples/`",
+      files: state.exampleFiles,
+      pendingNote: "Pending merge (`PR #2 feat/code-mode-library`)",
+    },
+    {
+      name: "`snippets/`",
+      files: state.snippetFiles,
+      pendingNote: "Pending merge (`PR #2 feat/code-mode-library`)",
+    },
+    {
+      name: "`scripts/`",
+      files: state.scriptFiles,
+      pendingNote: "No scripts found",
+    },
   ];
 
-  const rows = [
-    "| Area | Files | Contents |",
-    "| --- | --- | --- |",
-  ];
+  const rows = ["| Area | Files | Contents |", "| --- | --- | --- |"];
 
   for (const area of areas) {
     const count = area.files.length;
-    const contents = count > 0 ? summarizeFileList(area.files) : area.pendingNote;
+    const contents =
+      count > 0 ? summarizeFileList(area.files) : area.pendingNote;
     rows.push(`| ${area.name} | ${count} | ${contents} |`);
   }
 
@@ -258,7 +300,9 @@ export function renderBenchmarksBlock(state) {
     const baselineOut = m.toolOutputCharsReachingModel?.baseline;
     const candidateOut = m.toolOutputCharsReachingModel?.candidate;
     const reduction =
-      typeof baselineOut === "number" && typeof candidateOut === "number" && baselineOut > 0
+      typeof baselineOut === "number" &&
+      typeof candidateOut === "number" &&
+      baselineOut > 0
         ? ` (**-${(((baselineOut - candidateOut) / baselineOut) * 100).toFixed(1)}%**)`
         : "";
 
@@ -331,7 +375,10 @@ export function renderBenchmarksBlock(state) {
   }
 
   if (Array.isArray(bench?.NOT_VERIFIED) && bench.NOT_VERIFIED.length > 0) {
-    lines.push("", `**Not verified in synthetic bench:** ${bench.NOT_VERIFIED.map(escapeMarkdownCell).join("; ")}.`);
+    lines.push(
+      "",
+      `**Not verified in synthetic bench:** ${bench.NOT_VERIFIED.map(escapeMarkdownCell).join("; ")}.`,
+    );
   }
 
   return lines.join("\n");
@@ -342,7 +389,10 @@ export function renderRecentMergesBlock(state) {
   const lines = [];
 
   if (usingFallbackCommits) {
-    lines.push("Showing latest commits on `main` (no PR merge commits yet).", "");
+    lines.push(
+      "Showing latest commits on `main` (no PR merge commits yet).",
+      "",
+    );
   }
 
   lines.push("| Commit | Date | Summary |", "| --- | --- | --- |");
@@ -351,7 +401,9 @@ export function renderRecentMergesBlock(state) {
     lines.push("| — | — | No non-bot commits found |");
   } else {
     for (const row of commitRows) {
-      lines.push(`| \`${row.sha}\` | ${row.date} | ${escapeMarkdownCell(row.subject)} |`);
+      lines.push(
+        `| \`${row.sha}\` | ${row.date} | ${escapeMarkdownCell(row.subject)} |`,
+      );
     }
   }
 
@@ -362,9 +414,7 @@ export function renderSvgStatusInner(state) {
   const { pkg, srcFiles, testFiles, catalog, bench, headSha, headDate } = state;
 
   const mainState =
-    !pkg && srcFiles.length === 0
-      ? "Pre-merge"
-      : `v${pkg?.version ?? "0.0.0"}`;
+    !pkg && srcFiles.length === 0 ? "Pre-merge" : `v${pkg?.version ?? "0.0.0"}`;
   const mainStateColor = !pkg && srcFiles.length === 0 ? "#58A6FF" : "#3FB950";
 
   const codeModules =
@@ -374,7 +424,9 @@ export function renderSvgStatusInner(state) {
 
   let patternsBench = "Pending PR #2";
   let patternsBenchColor = "#F0F6FC";
-  const patternCount = Array.isArray(catalog?.patterns) ? catalog.patterns.length : null;
+  const patternCount = Array.isArray(catalog?.patterns)
+    ? catalog.patterns.length
+    : null;
   const benchRuns = typeof bench?.runs === "number" ? bench.runs : null;
   if (patternCount !== null && benchRuns !== null) {
     patternsBench = `${patternCount} patterns · ${benchRuns} runs`;
@@ -390,10 +442,34 @@ export function renderSvgStatusInner(state) {
   const headSync = `${headSha} · ${headDate}`;
 
   const columns = [
-    { x: 48, label: "MAIN STATE", value: mainState, color: mainStateColor, mono: false },
-    { x: 340, label: "CODE MODULES", value: codeModules, color: "#F0F6FC", mono: false },
-    { x: 632, label: "PATTERNS / BENCH", value: patternsBench, color: patternsBenchColor, mono: false },
-    { x: 924, label: "HEAD SYNC", value: headSync, color: "#3FB950", mono: true },
+    {
+      x: 48,
+      label: "MAIN STATE",
+      value: mainState,
+      color: mainStateColor,
+      mono: false,
+    },
+    {
+      x: 340,
+      label: "CODE MODULES",
+      value: codeModules,
+      color: "#F0F6FC",
+      mono: false,
+    },
+    {
+      x: 632,
+      label: "PATTERNS / BENCH",
+      value: patternsBench,
+      color: patternsBenchColor,
+      mono: false,
+    },
+    {
+      x: 924,
+      label: "HEAD SYNC",
+      value: headSync,
+      color: "#3FB950",
+      mono: true,
+    },
   ];
 
   const textNodes = columns
@@ -401,10 +477,10 @@ export function renderSvgStatusInner(state) {
       const valueFont = col.mono
         ? ` font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"`
         : "";
-      return (
-        `    <text x="${col.x}" y="38" fill="#8B949E" font-size="16" font-weight="600" letter-spacing="0.5">${escapeXml(col.label)}</text>\n` +
-        `    <text x="${col.x}" y="70" fill="${col.color}" font-size="22" font-weight="600"${valueFont}>${escapeXml(col.value)}</text>`
-      );
+      return [
+        `    <text x="${col.x}" y="38" fill="#8B949E" font-size="16" font-weight="600" letter-spacing="0.5">${escapeXml(col.label)}</text>`,
+        `    <text x="${col.x}" y="70" fill="${col.color}" font-size="22" font-weight="600"${valueFont}>${escapeXml(col.value)}</text>`,
+      ].join("\n");
     })
     .join("\n\n");
 
@@ -449,13 +525,38 @@ export function main() {
 
   const readmeOriginal = readFileSync(readmePath, "utf8");
   let readmeUpdated = readmeOriginal;
-  readmeUpdated = replaceMarkerBlock(readmeUpdated, "STATUS", renderStatusBlock(state), "README.md");
-  readmeUpdated = replaceMarkerBlock(readmeUpdated, "MODULES", renderModulesBlock(state), "README.md");
-  readmeUpdated = replaceMarkerBlock(readmeUpdated, "BENCHMARKS", renderBenchmarksBlock(state), "README.md");
-  readmeUpdated = replaceMarkerBlock(readmeUpdated, "RECENT_MERGES", renderRecentMergesBlock(state), "README.md");
+  readmeUpdated = replaceMarkerBlock(
+    readmeUpdated,
+    "STATUS",
+    renderStatusBlock(state),
+    "README.md",
+  );
+  readmeUpdated = replaceMarkerBlock(
+    readmeUpdated,
+    "MODULES",
+    renderModulesBlock(state),
+    "README.md",
+  );
+  readmeUpdated = replaceMarkerBlock(
+    readmeUpdated,
+    "BENCHMARKS",
+    renderBenchmarksBlock(state),
+    "README.md",
+  );
+  readmeUpdated = replaceMarkerBlock(
+    readmeUpdated,
+    "RECENT_MERGES",
+    renderRecentMergesBlock(state),
+    "README.md",
+  );
 
   const targets = [
-    { rel: "README.md", path: readmePath, original: readmeOriginal, updated: readmeUpdated },
+    {
+      rel: "README.md",
+      path: readmePath,
+      original: readmeOriginal,
+      updated: readmeUpdated,
+    },
   ];
 
   const svgPath = join(root, "assets", "readme", "status-badge.svg");
@@ -498,6 +599,9 @@ export function main() {
   }
 }
 
-if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+if (
+  process.argv[1] &&
+  fileURLToPath(import.meta.url) === resolve(process.argv[1])
+) {
   main();
 }

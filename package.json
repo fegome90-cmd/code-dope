@@ -3,14 +3,31 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=24 <25" },
+  "engines": {
+    "node": ">=24 <25"
+  },
   "packageManager": "pnpm@11.25.0",
-  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
-  "files": ["dist"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "tsc",
-    "test": "pnpm build && node --test scripts/package.test.mjs scripts/update-readme.test.mjs"
+    "test": "pnpm build && node --test scripts/package.test.mjs scripts/update-readme.test.mjs",
+    "format": "biome format --write .",
+    "lint:code": "biome check .",
+    "lint:md": "markdownlint-cli2",
+    "lint": "pnpm run lint:code && pnpm run lint:md"
   },
-  "devDependencies": { "typescript": "5.9.3" }
+  "devDependencies": {
+    "@biomejs/biome": "2.6.8",
+    "markdownlint-cli2": "0.24.1",
+    "typescript": "5.9.3"
+  }
 }

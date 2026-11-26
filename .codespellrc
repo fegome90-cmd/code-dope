@@ -1,0 +1,3 @@
+[codespell]
+skip = .git,.venv,node_modules,dist,archive,__pycache__,*.lock,pnpm-lock.yaml,*.svg,tools/agent-docs-kit
+ignore-words-list = argumentos,comando,constitucion,controles,falso,fase,hagas,historial,posible,requiere
