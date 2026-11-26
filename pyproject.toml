@@ -1,10 +1,31 @@
-# Sólo configuración de tooling para scripts Python opcionales.
+# Sólo configuración de tooling para scripts Python opcionales y linters transversales.
 # Code Dope no se distribuye como paquete Python ni lo requiere en ejecución.
+[project]
+name = "code-dope-tooling"
+version = "0.0.0"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = [
+  "ruff==0.17.5",
+  "yamllint==1.38.0",
+  "shellcheck-py==0.11.0.1",
+  "codespell==2.4.3",
+]
+
+[tool.uv]
+package = false
+required-version = "==0.13.9"
+
 [tool.ruff]
 target-version = "py312"
 line-length = 100
 force-exclude = true
-extend-exclude = ["dist", "node_modules"]
+extend-exclude = ["dist", "node_modules", ".venv", "tools/agent-docs-kit"]
 
 [tool.ruff.lint]
-select = ["E4", "E7", "E9", "F", "I"]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM"]
+
+[tool.ruff.format]
+quote-style = "double"

@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
@@ -66,9 +72,18 @@ function seedManagedFiles(dir) {
 }
 
 test("isSyncCommit identifies merge, squash, trailer, and skip-ci sync commits", () => {
-  assert.equal(isSyncCommit("Merge pull request #12 from org/docs/sync-readme"), true);
-  assert.equal(isSyncCommit("docs(readme): sync README metrics and modules (#12)"), true);
-  assert.equal(isSyncCommit("chore: manual squash title", "Auto-Sync: readme"), true);
+  assert.equal(
+    isSyncCommit("Merge pull request #12 from org/docs/sync-readme"),
+    true,
+  );
+  assert.equal(
+    isSyncCommit("docs(readme): sync README metrics and modules (#12)"),
+    true,
+  );
+  assert.equal(
+    isSyncCommit("chore: manual squash title", "Auto-Sync: readme"),
+    true,
+  );
   assert.equal(isSyncCommit("docs(readme): refresh [skip ci]"), true);
   assert.equal(isSyncCommit("feat(policy): add strict approve gate"), false);
   assert.equal(isSyncCommit("docs(readme): add architecture diagram"), false);
@@ -76,14 +91,26 @@ test("isSyncCommit identifies merge, squash, trailer, and skip-ci sync commits",
 
 test("parseGitLogRecords filters sync commits and honors limit", () => {
   const raw = [
-    ["aaa1111", "2026-11-26", "docs(readme): sync README metrics and modules", "Auto-Sync: readme"].join("\x1f"),
+    [
+      "aaa1111",
+      "2026-11-26",
+      "docs(readme): sync README metrics and modules",
+      "Auto-Sync: readme",
+    ].join("\x1f"),
     ["bbb2222", "2026-11-26", "feat: add executor", "Body text"].join("\x1f"),
-    ["ccc3333", "2026-11-25", "Merge pull request #7 from fegome90-cmd/docs/sync-readme", ""].join("\x1f"),
+    [
+      "ccc3333",
+      "2026-11-25",
+      "Merge pull request #7 from fegome90-cmd/docs/sync-readme",
+      "",
+    ].join("\x1f"),
     ["ddd4444", "2026-11-25", "chore: bootstrap", ""].join("\x1f"),
   ].join("\x1e");
 
   const one = parseGitLogRecords(raw, 1);
-  assert.deepEqual(one, [{ sha: "bbb2222", date: "2026-11-26", subject: "feat: add executor" }]);
+  assert.deepEqual(one, [
+    { sha: "bbb2222", date: "2026-11-26", subject: "feat: add executor" },
+  ]);
 
   const two = parseGitLogRecords(raw, 5);
   assert.deepEqual(two, [
@@ -96,11 +123,18 @@ test("update-readme converges to a fixed point after committing a sync PR and fl
   const dir = createTempRepo();
   try {
     seedManagedFiles(dir);
-    writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "code-dope", version: "0.1.0" }), "utf8");
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify({ name: "code-dope", version: "0.1.0" }),
+      "utf8",
+    );
     git(dir, ["add", "."]);
     git(dir, ["commit", "-m", "feat: initial code"]);
 
-    execFileSync(process.execPath, [SCRIPT_PATH], { cwd: dir, encoding: "utf8" });
+    execFileSync(process.execPath, [SCRIPT_PATH], {
+      cwd: dir,
+      encoding: "utf8",
+    });
 
     // Simulate merging the sync PR (commit without [skip ci], using Auto-Sync trailer).
     git(dir, ["add", "README.md", "assets/readme/status-badge.svg"]);
@@ -120,13 +154,21 @@ test("update-readme converges to a fixed point after committing a sync PR and fl
     assert.match(checkOut, /up to date/);
 
     // A new non-sync commit must cause --check to fail with exit 1.
-    writeFileSync(join(dir, "README.md"), readFileSync(join(dir, "README.md"), "utf8"), "utf8");
+    writeFileSync(
+      join(dir, "README.md"),
+      readFileSync(join(dir, "README.md"), "utf8"),
+      "utf8",
+    );
     writeFileSync(join(dir, "CHANGELOG.md"), "# Changelog\n", "utf8");
     git(dir, ["add", "CHANGELOG.md"]);
     git(dir, ["commit", "-m", "docs: add changelog"]);
 
     assert.throws(
-      () => execFileSync(process.execPath, [SCRIPT_PATH, "--check"], { cwd: dir, stdio: "pipe" }),
+      () =>
+        execFileSync(process.execPath, [SCRIPT_PATH, "--check"], {
+          cwd: dir,
+          stdio: "pipe",
+        }),
       (err) => err.status === 1,
     );
   } finally {
@@ -139,9 +181,18 @@ test("update-readme handles repos containing only sync commits without crashing"
   try {
     seedManagedFiles(dir);
     git(dir, ["add", "."]);
-    git(dir, ["commit", "-m", "docs(readme): sync README metrics and modules", "-m", "Auto-Sync: readme"]);
+    git(dir, [
+      "commit",
+      "-m",
+      "docs(readme): sync README metrics and modules",
+      "-m",
+      "Auto-Sync: readme",
+    ]);
 
-    execFileSync(process.execPath, [SCRIPT_PATH], { cwd: dir, encoding: "utf8" });
+    execFileSync(process.execPath, [SCRIPT_PATH], {
+      cwd: dir,
+      encoding: "utf8",
+    });
     const readme = readFileSync(join(dir, "README.md"), "utf8");
     assert.match(readme, /`0000000` \(unknown\)/);
   } finally {

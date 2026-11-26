@@ -56,7 +56,9 @@ jobs:
           fi
 
           if [ -z "${GH_TOKEN}" ]; then
-            echo "::error::README_SYNC_TOKEN secret is not configured. Add a fine-grained PAT or GitHub App token with Contents (Read and write) and Pull requests (Read and write) so the sync PR can be opened and trigger Bootstrap CI checks."
+            echo "::error::README_SYNC_TOKEN secret is not configured. Add a fine-grained PAT or GitHub App" \
+              "token with Contents (Read and write) and Pull requests (Read and write) so the sync PR can" \
+              "be opened and trigger Bootstrap CI checks."
             exit 1
           fi
 
@@ -65,9 +67,12 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add README.md assets/readme/status-badge.svg
           git commit -m "docs(readme): sync README metrics and modules" -m "Auto-Sync: readme"
-          git push --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/docs/sync-readme
+          git push --force \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            HEAD:refs/heads/docs/sync-readme
 
-          PR_NUM=$(gh pr list --head docs/sync-readme --base main --state open --json number --jq '.[0].number // empty')
+          PR_NUM=$(gh pr list --head docs/sync-readme --base main --state open \
+            --json number --jq '.[0].number // empty')
           if [ -z "${PR_NUM}" ]; then
             gh pr create \
               --base main \
