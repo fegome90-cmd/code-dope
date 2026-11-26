@@ -1,7 +1,7 @@
 # PLAN — Fase 3: bloqueos de la revisión del 2026-11-26
 
 Origen: revisión con 4 subagentes (3 Haiku verificando referencias externas, 1 Sonnet contrastando RESEARCH.md con el código). Los hallazgos técnicos T1–T3 fueron reproducidos de nuevo por Opus.
-Estado: **PROPUESTO**, pendiente de confirmación y de las decisiones D1 y D2. No se ha ejecutado nada.
+Estado: **APROBADO** (2026-11-26). Decisiones confirmadas por el usuario: **D1 = B** (`dist/` commiteado con verificación de deriva) y **D2 = A** (allowlists exactas cuando hay colisión, `deny` sanitizado). Ejecución: pendiente.
 
 Reglas comunes a todas las mejoras:
 - Cada una cierra con `npm run test:all` en verde y un commit propio en `claude/lucid-gates-g2l07h`.
@@ -11,8 +11,8 @@ Reglas comunes a todas las mejoras:
 | ID | Mejora | Tipo | Prioridad | Depende de | Decisión |
 |---|---|---|---|---|---|
 | M1 | Cortar escrituras después del fin de la ejecución | técnico / seguridad | 1 | — | — |
-| M2 | Colisión de nombres por puntuación | técnico / seguridad | 1 | — | D2 |
-| M3 | Instalable como dependencia (build de distribución) | técnico / bloqueante | 1 | — | D1 |
+| M2 | Colisión de nombres por puntuación | técnico / seguridad | 1 | — | D2 = A ✔ |
+| M3 | Instalable como dependencia (`dist/` commiteado) | técnico / bloqueante | 1 | — | D1 = B ✔ |
 | M4 | Reemplazo precalentado en el pool | rendimiento | 2 | — | — |
 | M5 | Respaldar afirmaciones [R] sin prueba | verificación | 2 | — | — |
 | M6 | Bench de carga sostenida del pool | verificación | 2 | M4 | — |
@@ -55,13 +55,15 @@ Reglas comunes a todas las mejoras:
 
 **Problema (reproducido).** `read: ["delete_user"]` también autoriza `delete-user` cuando ambas herramientas existen, porque `matches()` compara nombres sanitizados. `src/discovery.ts:101` (visibilidad en `search_tools`) tiene la misma lógica.
 
-**Diseño (propuesto para D2).**
+**Diseño (D2 = A, confirmado).**
 1. Nueva función pura `collisions(names: string[]): Set<string>` con los nombres reales cuyo sanitizado es compartido.
 2. `matches(list, provider, tool, { exact })`: si `tool` está en una colisión, las listas `read`, `write` y `validate` comparan solo el nombre exacto (con o sin `proveedor.`). `deny` siempre compara sanitizado, porque denegar de más es fail-closed.
 3. `guardFns` calcula las colisiones una vez por proveedor. `discovery.ts` reutiliza la misma función para su filtro `g()`.
 4. Sin colisión, el comportamiento no cambia, así que H2 y M1 de la Fase 1 siguen igual.
+5. **Mensaje explícito.** Cuando una herramienta que colisiona termina sin clasificar, la razón de denegación lo dice: `"<tool>" collides with "<other>" after sanitization; name it exactly in the policy`.
+6. **Tipos sin duplicados.** `createCodeModeMcpServer` y `createSearchExecuteMcpServer` excluyen de los tipos y de la descripción anunciada al modelo las variantes que colisionan y no están permitidas. Si las dos están permitidas, se anuncian por su nombre exacto (acceso `codemode["delete-user"]`), no por el alias sanitizado ambiguo.
 
-**Alternativa de D2.** Denegar siempre las herramientas que colisionan. Es más simple, pero las deja inutilizables.
+**Descartadas.** B (denegar u ocultar siempre las que colisionan) pierde herramientas legítimas. C (rechazar la ejecución completa, como `DynamicWorkerExecutor` de Cloudflare) inutiliza al proveedor entero.
 
 **Archivos.** `src/policy.ts`, `src/discovery.ts`. La documentación de `ToolPolicy` explica la regla.
 
@@ -70,6 +72,8 @@ Reglas comunes a todas las mejoras:
 - `deny: ["delete-user"]` con colisión deniega las dos variantes.
 - Sin colisión, `deny: ["delete-user"]` deniega `delete_user` (H2).
 - `search_tools` no muestra la variante no permitida.
+- La razón de denegación menciona la colisión.
+- La descripción y los tipos de `createCodeModeMcpServer` no contienen declaraciones duplicadas ni la variante no permitida.
 - Se cubren los tres executors y los dos servidores MCP.
 
 **Aceptación.** Ninguna allowlist autoriza un nombre real distinto del escrito cuando hay ambigüedad.
@@ -77,27 +81,38 @@ Reglas comunes a todas las mejoras:
 
 ---
 
-## M3. Instalable como dependencia (build de distribución)
+## M3. Instalable como dependencia (`dist/` commiteado)
 
 **Problema (reproducido).** Node no hace type stripping bajo `node_modules`: `import "code-dope"` falla con `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`. El camino de instalación del README no funciona.
 
-**Diseño (propuesto para D1: build solo para distribución, `dist/` no commiteado).**
-1. `tsconfig.build.json`: `include: ["src"]`, `outDir: "dist"`, `declaration: true`, `rewriteRelativeImportExtensions: true` (TS 5.7 o superior; hay 5.9.3), `noEmit: false`, `allowImportingTsExtensions` compatible con ese rewrite.
-2. Script `build`: `tsc -p tsconfig.build.json`, más la copia de `src/sandbox/helpers.js` a `dist/sandbox/` (un script Node de unas 5 líneas, sin dependencias nuevas). El script `prepare` llama a `build`, así que npm construye al instalar desde git.
-3. `package.json#exports`: `{ ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" }, "./mcp": … }`, más `files: ["dist", "snippets", "catalog", "THIRD_PARTY_NOTICES.md"]`. En el repo, el desarrollo sigue importando `src/*.ts` por ruta relativa (tests, examples, bench), así que no necesita build.
-4. `WORKER_ENTRY`: resolverlo con la misma extensión del módulo actual: `new URL(\`./worker-entry${import.meta.url.endsWith(".ts") ? ".ts" : ".js"}\`, import.meta.url)`.
-5. `.gitignore` incluye `dist/`.
-6. CLAUDE.md: "sin build en desarrollo; `npm run build` solo para distribución". El README documenta la instalación.
+**Decisión (D1 = B, confirmada).** `dist/` se commitea y no hay script `prepare`. Motivo, probado con un prototipo: la opción `prepare` falla por defecto en pnpm 10 (`ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED`) y, según la documentación, también en Bun. `dist/` commiteado funcionó en npm, en npm con `--ignore-scripts` y en pnpm, con worker y pool.
 
-**Alternativa de D1.** Commitear `dist/`: sirve a consumidores que instalan sin devDependencies, a cambio de diffs duplicados y del riesgo de desincronización.
+**Diseño.**
+1. `tsconfig.build.json`: extiende `tsconfig.json` con `noEmit: false`, `outDir: "dist"`, `rootDir: "src"`, `declaration: true`, `rewriteRelativeImportExtensions: true` e `include: ["src"]`. Probado con TS 5.9.3.
+2. Script `build`: `tsc -p tsconfig.build.json`, más la copia de `src/sandbox/` a `dist/sandbox/` (`helpers.js` se lee en runtime con `readFileSync`). Se borra `dist/` antes de compilar para que no queden archivos huérfanos.
+3. `WORKER_ENTRY` en `src/executor/worker-executor.ts`: elige `./worker-entry.ts` o `./worker-entry.js` según `import.meta.url`. tsc no reescribe `new URL(...)`; probado en el prototipo.
+4. `package.json`:
+   - `exports` con `{ ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" }, "./mcp": { … } }`;
+   - `files: ["dist", "snippets", "catalog", "THIRD_PARTY_NOTICES.md", "README.md"]`;
+   - sin `prepare`.
+   En el repo, los tests, examples y bench siguen importando `src/*.ts` por ruta relativa, así que el desarrollo sigue sin build.
+5. **Verificación de deriva:** script `check:dist` (`npm run build && git diff --exit-code -- dist/`) incluido en `test:all`. Si alguien cambia `src/` sin reconstruir, `test:all` falla.
+6. `.gitattributes`: `dist/** linguist-generated=true -diff`, para que los diffs y las revisiones de PR no se inflen.
+7. CLAUDE.md:
+   - "sin build en desarrollo; después de cambiar `src/` corre `npm run build` y commitea `dist/` (lo verifica `test:all`)";
+   - "no edites `dist/` a mano".
+   README: instalación (`npm install git+ssh://…#<tag o commit>`, compatible con npm, pnpm y Bun sin configuración extra).
+
+**Variante futura B′.** `dist/` solo en tags de release. No entra en esta fase.
 
 **Pruebas.**
-- `tests/package.test.ts`: `npm run build`, `npm pack`, y luego instalar el `.tgz` en un directorio temporal (`os.tmpdir()` + `mkdtemp`). El consumidor importa `code-dope` y `code-dope/mcp` y corre `createCodeRunner` en worker y en pool. La prueba es lenta (unos 20 s), así que va en un script `test:pkg` incluido en `test:all`.
-- El typecheck del consumidor usa los `.d.ts`.
+- `tests/package.test.ts`: `npm pack` del repo, instalación del `.tgz` en un directorio temporal (`os.tmpdir()` + `mkdtemp`), y un consumidor que importa `code-dope` y `code-dope/mcp` y corre `createCodeRunner` en worker y en pool. Es lenta (~10 s), así que va en el script `test:pkg`, incluido en `test:all`.
+- Los `.d.ts` pasan un typecheck en el consumidor.
+- La instalación desde `git+file://` con pnpm se probó manualmente en el prototipo. No entra en `test:all` porque requiere descargar pnpm.
 
-**Aceptación.** Un proyecto externo instala desde git o desde el tarball y ejecuta código en los tres modos sin flags.
-**Riesgos.** Que `prepare` en una instalación desde git requiera devDependencies (npm las instala para `prepare`, pero conviene confirmarlo en la prueba). Que tsc no reescriba `new URL("./x.ts")`: por eso el punto 4.
-**Esfuerzo.** Medio. Lo implementa Opus o Sonnet.
+**Aceptación.** Un proyecto externo instala desde git o desde el tarball con npm o pnpm, sin flags ni allowlists, y ejecuta código en los tres modos. `test:all` falla si `dist/` está desfasado.
+**Riesgos.** Que la salida de tsc varíe entre máquinas y la verificación de deriva dé falsos positivos: se mitiga fijando la versión de `typescript` en devDependencies (hoy `^5.9.0`; fijar `5.9.3`). Diffs duplicados en cada cambio a `src/`.
+**Esfuerzo.** Medio. Opus implementa.
 
 ---
 
@@ -154,7 +169,7 @@ Reglas comunes a todas las mejoras:
   - §5: el pool y su riesgo (módulo WASM reutilizado).
   - §9: los 4 subagentes de esta revisión.
   - §10 nuevo: Fase 2 y Fase 3.
-- **ARCHITECTURE.md:** diagrama con el pool y, si M3 se hace, una sección de distribución.
+- **ARCHITECTURE.md:** diagrama con el pool y una sección de distribución (`dist/` commiteado, verificación de deriva).
 - **README.md:** tabla de bench separando caliente, tras error y en frío; instalación (M3); garantías (M1, M2).
 - **Handoff:** `HANDOFF-…-PHASE-3.md`.
 
@@ -172,7 +187,7 @@ Fuera del alcance de esta fase, salvo que lo autorices. Para diseñarla conviene
 
 ---
 
-## Decisiones pendientes (investigadas el 2026-11-26)
+## Decisiones (investigadas y confirmadas el 2026-11-26)
 
 ### D1: cómo distribuir el build
 
@@ -187,7 +202,7 @@ En los casos OK funcionaron el worker y el pool desde `dist/`.
 
 Documentación, según Haiku: Bun no ejecuta scripts de dependencias que no estén en `trustedDependencies`, y Yarn Berry usa `prepack` en vez de `prepare` para dependencias git [O doc, no probado]. Node rechaza a propósito el type stripping en `node_modules` y recomienda publicar JS [O doc].
 
-**Recomendación: B**, con una verificación de deriva en `test:all` (`npm run build && git diff --exit-code dist/`) para que `dist/` no quede desfasado de `src/`. Funciona con cualquier gestor sin configuración del consumidor. El costo son diffs duplicados en cada cambio.
+**Confirmada: B**, con una verificación de deriva en `test:all` (`npm run build && git diff --exit-code dist/`) para que `dist/` no quede desfasado de `src/`. Funciona con cualquier gestor sin configuración del consumidor. El costo son diffs duplicados en cada cambio.
 
 Variante B′: `dist/` solo en tags de release, generado por un script, con los consumidores fijados a `#vX.Y.Z`. Deja `main` limpio, pero exige disciplina de release. Se puede adoptar más adelante.
 
@@ -205,7 +220,7 @@ Evidencia:
 | B: denegar u ocultar las que colisionan | máxima | pierde ambas herramientas | simple |
 | C: rechazar la ejecución completa (como Cloudflare) | máxima, y ruidosa | inutiliza al proveedor entero | idéntica al upstream |
 
-**Recomendación: A**, con dos agregados:
+**Confirmada: A**, con dos agregados:
 1. La razón de denegación menciona la colisión ("`delete-user` collides with `delete_user`; name it exactly"), para que se entienda el `not classified`.
 2. `createCodeModeMcpServer` y el servidor search/execute omiten de los tipos anunciados las variantes no permitidas, para que el modelo no vea declaraciones duplicadas.
 
