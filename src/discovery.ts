@@ -13,11 +13,11 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { z } from "zod";
 import type { Executor } from "@cloudflare/codemode";
-import { generateTypesFromJsonSchema } from "./vendor/cf-json-schema-types.ts";
-import { sanitizeToolName } from "./vendor/cf-utils.ts";
+import { generateTypesFromJsonSchema, jsonSchemaToType } from "./vendor/cf-json-schema-types.ts";
+import { sanitizeToolName, escapeJsDoc } from "./vendor/cf-utils.ts";
 import { createDefaultExecutor, type Isolation } from "./executor/default.ts";
 import type { PooledWorkerExecutorOptions } from "./executor/pool-executor.ts";
-import { withPolicy, type ToolPolicy } from "./policy.ts";
+import { collisions, policyAllows, withPolicy, type ToolPolicy } from "./policy.ts";
 import { HELPERS_DOC } from "./helpers.ts";
 
 export interface ToolEntry {
@@ -54,7 +54,19 @@ export function searchTools(catalog: ToolEntry[], query: string, limit = 5): Too
 }
 
 /** TypeScript declarations for a subset of tools (Cloudflare generator, vendored). */
-export function typesFor(tools: ToolEntry[]): string {
+export function typesFor(tools: ToolEntry[], ambiguous = collisions(tools.map((t) => t.name))): string {
+  if (tools.some((t) => ambiguous.has(t.name))) {
+    // Unique type names and quoted properties keep exact tool names distinct.
+    const declarations: string[] = [];
+    const methods = tools.map((t, i) => {
+      const input = `Tool${i}Input`;
+      declarations.push(jsonSchemaToType((t.inputSchema ?? { type: "object" }) as JSONSchema7, input));
+      const name = ambiguous.has(t.name) ? t.name : sanitizeToolName(t.name);
+      const doc = t.description ? `\n\t/** ${escapeJsDoc(t.description.replace(/\r?\n/g, " "))} */` : "";
+      return `${doc}\n\t${JSON.stringify(name)}: (input: ${input}) => Promise<unknown>;`;
+    });
+    return `${declarations.join("\n")}\ndeclare const codemode: {${methods.join("")}\n}`;
+  }
   return generateTypesFromJsonSchema(
     Object.fromEntries(tools.map((t) => [t.name, { description: t.description, inputSchema: (t.inputSchema ?? { type: "object" }) as JSONSchema7 }])),
   );
@@ -97,12 +109,9 @@ export async function createSearchExecuteMcpServer(o: SearchExecuteOptions): Pro
   await client.connect(ct);
   const { tools } = await client.listTools();
   // Only tools the policy could ever allow are discoverable.
-  const usable = (name: string) => {
-    const g = (l?: string[]) => !!l && l.some((e) => e === "*" || sanitizeToolName(e.replace(/^codemode\./, "")) === sanitizeToolName(name));
-    return !g(o.policy.deny) && (g(o.policy.read) || g(o.policy.write));
-  };
+  const ambiguous = collisions(tools.map((t) => t.name));
   const catalog: ToolEntry[] = tools
-    .filter((t) => usable(t.name))
+    .filter((t) => policyAllows(o.policy, "codemode", t.name, ambiguous))
     .map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema }));
 
   // Keyed by the ORIGINAL name so policy lists/validators written with the
@@ -127,7 +136,7 @@ export async function createSearchExecuteMcpServer(o: SearchExecuteOptions): Pro
     async ({ query, limit }) => {
       const hits = searchTools(catalog, query, limit ?? 5);
       const body = hits.length
-        ? `${hits.map((h) => `- ${sanitizeToolName(h.name)}: ${h.description ?? ""}`).join("\n")}\n\n${typesFor(hits)}`
+        ? `${hits.map((h) => `- ${ambiguous.has(h.name) ? `codemode[${JSON.stringify(h.name)}]` : sanitizeToolName(h.name)}: ${h.description ?? ""}`).join("\n")}\n\n${typesFor(hits, ambiguous)}`
         : "No matching tools. Try other words.";
       return { content: [{ type: "text", text: body }] };
     },

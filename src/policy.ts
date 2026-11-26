@@ -50,15 +50,15 @@ export interface AuditRecord {
 }
 
 export interface ToolPolicy {
-  /** Tools without side effects. Names match `tool` or `provider.tool`. `"*"` matches all. */
+  /** Tools without side effects. Names match `tool` or `provider.tool`; collisions require exact names, even with `"*"`. */
   read?: string[];
   /** Tools with side effects. Each call needs `approve()` → true. */
   write?: string[];
-  /** Always denied, evaluated first. */
+  /** Always denied, evaluated first. Names are sanitized even when tools collide. */
   deny?: string[];
   /** Approval hook for write tools. Missing hook ⇒ writes denied. */
   approve?: (req: ApprovalRequest) => boolean | Promise<boolean>;
-  /** Per-tool argument validators. */
+  /** Per-tool argument validators; colliding tool names match exactly. */
   validate?: Record<string, ArgValidator>;
   /** Max host tool calls per execution. Default 50. */
   maxCalls?: number;
@@ -74,14 +74,22 @@ export class PolicyError extends Error {
   override name = "PolicyError";
 }
 
-/**
- * Names are compared after the same sanitization used for the advertised
- * TypeScript names, so `delete-user`, `delete_user` and `crm.delete-user` all
- * match the same tool. A bare name matches that tool in every provider; use
- * `provider.tool` to scope it.
- */
-function matches(list: string[] | undefined, provider: string, tool: string): boolean {
+/** Real names that share a sanitized alias with a different tool in one provider. */
+export function collisions(names: string[]): Set<string> {
+  const groups = new Map<string, string[]>();
+  for (const name of new Set(names)) {
+    const alias = sanitizeToolName(name);
+    const group = groups.get(alias) ?? [];
+    group.push(name);
+    groups.set(alias, group);
+  }
+  return new Set([...groups.values()].filter((group) => group.length > 1).flat());
+}
+
+/** Exact allowlist matching for ambiguous names; deny lists always use sanitization. */
+export function matches(list: string[] | undefined, provider: string, tool: string, { exact = false } = {}): boolean {
   if (!list) return false;
+  if (exact) return list.some((e) => e === tool || e === `${provider}.${tool}`);
   const t = sanitizeToolName(tool);
   return list.some((e) => {
     if (e === "*") return true;
@@ -91,16 +99,21 @@ function matches(list: string[] | undefined, provider: string, tool: string): bo
   });
 }
 
-function findValidator(p: ToolPolicy, provider: string, tool: string): ArgValidator | undefined {
+function findValidator(p: ToolPolicy, provider: string, tool: string, exact: boolean): ArgValidator | undefined {
   if (!p.validate) return undefined;
-  for (const [k, v] of Object.entries(p.validate)) if (matches([k], provider, tool)) return v;
+  for (const [k, v] of Object.entries(p.validate)) if (matches([k], provider, tool, { exact })) return v;
   return undefined;
 }
 
-function classify(p: ToolPolicy, provider: string, tool: string): ToolKind | "unclassified" {
-  if (matches(p.write, provider, tool)) return "write";
-  if (matches(p.read, provider, tool)) return "read";
+function classify(p: ToolPolicy, provider: string, tool: string, exact: boolean): ToolKind | "unclassified" {
+  if (matches(p.write, provider, tool, { exact })) return "write";
+  if (matches(p.read, provider, tool, { exact })) return "read";
   return "unclassified";
+}
+
+/** Whether a tool can be advertised; approval and validation still apply at invocation. */
+export function policyAllows(p: ToolPolicy, provider: string, tool: string, ambiguous: Set<string>): boolean {
+  return !matches(p.deny, provider, tool) && classify(p, provider, tool, ambiguous.has(tool)) !== "unclassified";
 }
 
 function runValidator(v: ArgValidator, args: unknown): string | undefined {
@@ -140,11 +153,13 @@ export function guardFns(provider: string, fns: Fns, policy: ToolPolicy, state: 
   const maxCalls = policy.maxCalls ?? 50;
   const callTimeoutMs = policy.callTimeoutMs ?? 15_000;
   const maxResultChars = policy.maxResultChars ?? 1_000_000;
+  const ambiguous = collisions(Object.keys(fns));
   const out: Fns = {};
   for (const [tool, fn] of Object.entries(fns)) {
     out[tool] = async (args: unknown) => {
       const seq = ++state.seq;
-      const kind = classify(policy, provider, tool);
+      const exact = ambiguous.has(tool);
+      const kind = classify(policy, provider, tool, exact);
       const started = Date.now();
       const base = { seq, provider, tool, kind, argsChars: size(args) };
       const deny = (reason: string): never => {
@@ -154,7 +169,11 @@ export function guardFns(provider: string, fns: Fns, policy: ToolPolicy, state: 
 
       if (state.closed) deny("execution already finished");
       if (matches(policy.deny, provider, tool)) deny("tool is on the deny list");
-      if (kind === "unclassified") deny("tool is not classified as read or write (fail-closed)");
+      if (kind === "unclassified") {
+        const other = exact ? [...ambiguous].find((name) => name !== tool && sanitizeToolName(name) === sanitizeToolName(tool)) : undefined;
+        const detail = other === undefined ? "" : `; ${JSON.stringify(tool)} collides with ${JSON.stringify(other)} after sanitization; name it exactly in the policy`;
+        deny(`tool is not classified as read or write (fail-closed)${detail}`);
+      }
       // Reserve the budget slot synchronously, before any await, so concurrent
       // calls cannot all pass the check while an async approval is pending.
       if (state.calls >= maxCalls) deny(`call budget of ${maxCalls} exhausted`);
@@ -174,7 +193,7 @@ export function guardFns(provider: string, fns: Fns, policy: ToolPolicy, state: 
         release();
         deny("arguments are not cloneable");
       }
-      const v = findValidator(policy, provider, tool);
+      const v = findValidator(policy, provider, tool, exact);
       if (v) {
         let problem: string | undefined;
         try {

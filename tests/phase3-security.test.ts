@@ -267,3 +267,289 @@ for (const kind of phase3ExecutorKinds) {
       assert.equal(writes, 1, "one approval slot must never produce two tool invocations");
     });
 }
+// Concatenate after phase3-security-m1.test.ts; imports and lifecycle helpers
+// intentionally live in M1 only. These assertions were written without reading
+// implementation or existing tests.
+
+for (const kind of phase3ExecutorKinds) {
+  for (const classification of ["read", "write"] as const) {
+    for (const allowed of ["delete_user", "delete-user"] as const) {
+      const forbidden = allowed === "delete_user" ? "delete-user" : "delete_user";
+      test(`M2 ${kind}: ${classification} names collision member ${allowed} exactly`,
+        { timeout: 5_000 }, async (t) => {
+          const inner = phase3Executor(kind);
+          const invoked: string[] = [];
+          let approvals = 0;
+          const executor = withPolicy(inner, {
+            [classification]: [allowed],
+            approve: async () => { approvals += 1; return true; },
+          });
+          t.after(() => phase3Dispose(inner));
+          const fns: Phase3Fns = {
+            delete_user: async () => { invoked.push("delete_user"); return "underscore"; },
+            "delete-user": async () => { invoked.push("delete-user"); return "hyphen"; },
+          };
+
+          const allowedResult = await executor.execute(
+            `async () => codemode[${JSON.stringify(allowed)}]({ id: 'one' })`, fns,
+          );
+          phase3AssertSuccess(allowedResult, allowed === "delete_user" ? "underscore" : "hyphen");
+          const deniedResult = await executor.execute(
+            `async () => codemode[${JSON.stringify(forbidden)}]({ id: 'two' })`, fns,
+          );
+          assert.equal(typeof deniedResult.error, "string");
+          assert.match(String(deniedResult.error), /not classified/i);
+          assert.ok(String(deniedResult.error).includes(
+            `"${forbidden}" collides with "${allowed}" after sanitization; name it exactly in the policy`,
+          ), "unclassified collision denial must name both tools and the exact-policy remedy");
+          assert.deepEqual(invoked, [allowed], "a policy entry must authorize only its exact collision member");
+          assert.equal(approvals, classification === "write" ? 1 : 0,
+            "an unclassified colliding tool must never reach approval");
+        });
+    }
+  }
+
+  test(`M2 ${kind}: deny remains sanitized and blocks both collision members`,
+    { timeout: 5_000 }, async (t) => {
+      const inner = phase3Executor(kind);
+      let invoked = 0;
+      const executor = withPolicy(inner, {
+        read: ["delete_user", "delete-user"],
+        deny: ["delete-user"],
+      });
+      t.after(() => phase3Dispose(inner));
+      const fns: Phase3Fns = {
+        delete_user: async () => { invoked += 1; return "underscore"; },
+        "delete-user": async () => { invoked += 1; return "hyphen"; },
+      };
+      for (const name of ["delete_user", "delete-user"]) {
+        const outcome = await executor.execute(
+          `async () => codemode[${JSON.stringify(name)}]({})`, fns,
+        );
+        assert.equal(typeof outcome.error, "string");
+        assert.match(String(outcome.error), /denied/i);
+      }
+      assert.equal(invoked, 0, "sanitized deny must cover every variant in the collision");
+    });
+
+  test(`M2 ${kind}: sanitized deny keeps its behavior when no collision exists`,
+    { timeout: 5_000 }, async (t) => {
+      const inner = phase3Executor(kind);
+      let invoked = 0;
+      const executor = withPolicy(inner, {
+        read: ["delete_user"],
+        deny: ["delete-user"],
+      });
+      t.after(() => phase3Dispose(inner));
+      const outcome = await executor.execute(
+        "async () => codemode.delete_user({})",
+        { delete_user: async () => { invoked += 1; return "deleted"; } },
+      );
+      assert.equal(typeof outcome.error, "string");
+      assert.match(String(outcome.error), /denied/i);
+      assert.equal(invoked, 0);
+    });
+
+  test(`M2 ${kind}: validators match the exact member of a collision`,
+    { timeout: 5_000 }, async (t) => {
+      const inner = phase3Executor(kind);
+      const invoked: string[] = [];
+      let validations = 0;
+      const executor = withPolicy(inner, {
+        read: ["delete_user", "delete-user"],
+        validate: {
+          delete_user: () => { validations += 1; return "underscore blocked by validator"; },
+        },
+      });
+      t.after(() => phase3Dispose(inner));
+      const fns: Phase3Fns = {
+        delete_user: async () => { invoked.push("delete_user"); return "underscore"; },
+        "delete-user": async () => { invoked.push("delete-user"); return "hyphen"; },
+      };
+      phase3AssertSuccess(await executor.execute(
+        "async () => codemode['delete-user']({})", fns,
+      ), "hyphen");
+      assert.equal(validations, 0, "the other collision member must not inherit a validator");
+      const blocked = await executor.execute("async () => codemode.delete_user({})", fns);
+      assert.match(String(blocked.error), /underscore blocked by validator/);
+      assert.equal(validations, 1);
+      assert.deepEqual(invoked, ["delete-user"]);
+    });
+}
+
+for (const kind of phase3ExecutorKinds) {
+  test(`M2 ${kind}: provider-qualified allowlists name a collision member exactly`,
+    { timeout: 5_000 }, async (t) => {
+      const inner = phase3Executor(kind);
+      const invoked: string[] = [];
+      const executor = withPolicy(inner, { read: ["catalog.delete_user"] });
+      t.after(() => phase3Dispose(inner));
+      const providers = [{ name: "catalog", fns: {
+        delete_user: async () => { invoked.push("delete_user"); return "underscore"; },
+        "delete-user": async () => { invoked.push("delete-user"); return "hyphen"; },
+      } }];
+      phase3AssertSuccess(await executor.execute(
+        "async () => catalog.delete_user({})", providers,
+      ), "underscore");
+      const forbidden = await executor.execute(
+        "async () => catalog['delete-user']({})", providers,
+      );
+      assert.match(String(forbidden.error), /not classified/i);
+      assert.match(String(forbidden.error), /collides.*after sanitization/i);
+      assert.deepEqual(invoked, ["delete_user"]);
+    });
+
+  test(`M2 ${kind}: an unambiguous sanitized allowlist retains compatibility`,
+    { timeout: 5_000 }, async (t) => {
+      const inner = phase3Executor(kind);
+      let invoked = 0;
+      const executor = withPolicy(inner, { read: ["delete-user"] });
+      t.after(() => phase3Dispose(inner));
+      phase3AssertSuccess(await executor.execute("async () => codemode.delete_user({})", {
+        delete_user: async () => { invoked += 1; return "underscore"; },
+      }), "underscore");
+      assert.equal(invoked, 1);
+    });
+}
+
+// Public-protocol scaffolding only. Text is read from actual MCP responses;
+// names, descriptions and declarations are never reconstructed from the policy.
+type Phase3McpKind = "code-mode" | "search-execute";
+
+function phase3McpText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value.map(phase3McpText).join("\n");
+  if (value && typeof value === "object") {
+    return Object.values(value).map(phase3McpText).join("\n");
+  }
+  return "";
+}
+
+// Recognize ordinary TS callable declarations, preserving duplicate matches.
+// Hyphenated declarations must use a quoted or computed property name.
+function phase3DeclarationNames(text: string): string[] {
+  const names: string[] = [];
+  for (const name of ["delete_user", "delete-user"]) {
+    const quoted = `["']${name}["']`;
+    const spelling = name === "delete_user"
+      ? `(?:delete_user|${quoted}|\\[\\s*${quoted}\\s*\\])`
+      : `(?:${quoted}|\\[\\s*${quoted}\\s*\\])`;
+    const callable = new RegExp(
+      `(?<![\\w$.-])${spelling}\\s*(?:\\([^)]*\\)\\s*:|:\\s*\\([^)]*\\)\\s*=>)`,
+      "g",
+    );
+    for (const _match of text.matchAll(callable)) names.push(name);
+  }
+  return names;
+}
+
+async function phase3McpFixture(
+  kind: Phase3McpKind,
+  isolation: Phase3ExecutorKind,
+  policy: Phase3Policy,
+) {
+  const invoked: string[] = [];
+  const upstream = new McpServer({ name: "phase3-collision-fixture", version: "1.0.0" });
+  for (const name of ["delete_user", "delete-user"]) {
+    upstream.registerTool(name, {
+      description: `Delete fixture tool with exact name ${name}.`,
+      inputSchema: {},
+    }, async () => {
+      invoked.push(name);
+      return { content: [{ type: "text" as const, text: name }] };
+    });
+  }
+  const inner = phase3Executor(isolation);
+  const client = new Client({ name: "phase3-collision-client", version: "1.0.0" });
+  let server: McpServer | undefined;
+  const close = async () => {
+    await Promise.allSettled([
+      client.close(),
+      ...(server ? [server.close()] : []),
+      upstream.close(),
+      phase3Dispose(inner),
+    ]);
+  };
+  try {
+    const factory = kind === "code-mode" ? createCodeModeMcpServer : createSearchExecuteMcpServer;
+    server = await factory({ upstream, policy, executor: inner });
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+    const listed = await client.listTools();
+    const descriptions = listed.tools.map((tool) => tool.description ?? "").join("\n");
+    let declarationText: string;
+    let advertisedText = descriptions;
+    if (kind === "code-mode") {
+      const codeTools = listed.tools.filter((tool) => tool.name === "code");
+      assert.equal(codeTools.length, 1, "the simple MCP surface must expose its code tool");
+      declarationText = codeTools[0].description ?? "";
+    } else {
+      const discovery = await client.callTool({
+        name: "search_tools", arguments: { query: "delete", limit: 20 },
+      });
+      assert.notEqual(discovery.isError, true, "discovery must complete successfully");
+      declarationText = phase3McpText(discovery);
+      advertisedText += `\n${declarationText}`;
+    }
+    return {
+      invoked,
+      advertisedText,
+      declarationNames: phase3DeclarationNames(declarationText),
+      close,
+      execute: (code: string) => client.callTool({
+        name: kind === "code-mode" ? "code" : "execute", arguments: { code },
+      }),
+    };
+  } catch (error) {
+    await close();
+    throw error;
+  }
+}
+
+for (const kind of ["code-mode", "search-execute"] as const) {
+  for (const isolation of phase3ExecutorKinds) {
+    test(`M2 MCP ${kind} ${isolation}: discovery hides the unclassified collision member everywhere`,
+      { timeout: 5_000 }, async (t) => {
+        const fixture = await phase3McpFixture(kind, isolation, { read: ["delete_user"] });
+        t.after(fixture.close);
+        assert.deepEqual(fixture.declarationNames, ["delete_user"],
+          "the permitted tool must have exactly one callable declaration");
+        assert.ok(fixture.advertisedText.includes("delete_user"));
+        assert.ok(!fixture.advertisedText.includes("delete-user"),
+          "the forbidden name must not leak into types or published descriptions");
+        const result = await fixture.execute("async () => codemode.delete_user({})");
+        assert.notEqual(result.isError, true);
+        assert.deepEqual(fixture.invoked, ["delete_user"]);
+      });
+
+    test(`M2 MCP ${kind} ${isolation}: both allowed members have distinct exact declarations and work`,
+      { timeout: 5_000 }, async (t) => {
+        const fixture = await phase3McpFixture(kind, isolation, {
+          read: ["delete_user", "delete-user"],
+        });
+        t.after(fixture.close);
+        assert.deepEqual([...fixture.declarationNames].sort(), ["delete-user", "delete_user"],
+          "each real name must have one callable declaration; duplicate aliases are forbidden");
+        assert.ok(fixture.advertisedText.includes("delete_user"));
+        assert.ok(fixture.advertisedText.includes("delete-user"));
+        const result = await fixture.execute(
+          "async () => { await codemode.delete_user({}); return await codemode['delete-user']({}); }",
+        );
+        assert.notEqual(result.isError, true);
+        assert.deepEqual(fixture.invoked, ["delete_user", "delete-user"],
+          "both exact guest names must reach their own upstream tools");
+      });
+
+    test(`M2 MCP ${kind} ${isolation}: sanitized deny hides both collision members`,
+      { timeout: 5_000 }, async (t) => {
+        const fixture = await phase3McpFixture(kind, isolation, {
+          read: ["delete_user", "delete-user"], deny: ["delete-user"],
+        });
+        t.after(fixture.close);
+        assert.deepEqual(fixture.declarationNames, []);
+        assert.ok(!fixture.advertisedText.includes("delete_user"));
+        assert.ok(!fixture.advertisedText.includes("delete-user"));
+        assert.deepEqual(fixture.invoked, []);
+      });
+  }
+}
