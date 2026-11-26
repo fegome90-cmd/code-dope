@@ -75,30 +75,51 @@ async () => {
 ## Garantías de seguridad (y sus límites)
 
 - El código del modelo corre en QuickJS-WASM: sin `require`, `process`, `fetch`, fs, timers ni red. Por el puente solo cruzan strings JSON; ningún objeto del host entra al guest. Verificado en `tests/executor.test.ts` y en la revisión independiente.
-- Por defecto (`isolation: "worker"`) cada ejecución usa un worker thread nuevo, con `env` vacío y límite de heap V8. Un bucle de CPU no bloquea el host, el timeout termina el worker de forma dura y cualquier estado WASM dañado muere con él. `isolation: "pool"` mantiene ese aislamiento pero reutiliza workers precalentados (~5 ms por ejecución en caliente): cada ejecución recibe un runtime y contexto QuickJS nuevos, y el worker se descarta tras **cualquier** ejecución con error y tras `maxUses` (100) éxitos. Los workers ociosos no retienen el proceso; `close()` detiene el pool. `isolation: "inline"` también cuesta ~5 ms, pero un bucle bloquea el event loop hasta el deadline.
+- Por defecto (`isolation: "worker"`) cada ejecución usa un worker thread nuevo, con `env` vacío y límite de heap V8. Un bucle de CPU no bloquea el host y un watchdog puede terminar el worker. `isolation: "pool"` reutiliza workers precalentados (p50 2,74 ms en este bench): cada ejecución recibe un runtime y contexto QuickJS nuevos, pero comparte el módulo WASM cargado. El worker se descarta tras **cualquier** ejecución con error y tras `maxUses` (100) usos. Con `prewarm: true`, el reemplazo comienza a calentarse al reciclar; `stats.warming` cuenta los slots todavía sin señal de disponibilidad. El reaping por `idleMs` no crea reemplazos. Los workers ociosos no retienen el proceso; `close()` detiene el pool. `isolation: "inline"` midió p50 2,44 ms, pero un bucle bloquea el event loop hasta el deadline.
 - Límites: timeout de reloj (incluye la espera de herramientas), interrupción de CPU, memoria, stack, logs, llamadas en vuelo y tamaño y profundidad del resultado.
-- La policy envuelve las funciones host **antes** de que el sandbox las vea, así que el código no puede saltarse la allowlist, las aprobaciones, la validación ni el presupuesto. Es fail-closed: una herramienta sin clasificar se deniega, y una escritura sin `approve` también. Sin colisión, los nombres se comparan sanitizados (`delete-user` = `delete_user`). Si coexisten variantes con el mismo sanitizado, `read`, `write` y `validate` requieren el nombre exacto (también con `"*"`); `deny` sigue denegando todas las variantes sanitizadas. Ambos servidores MCP anuncian solo las variantes permitidas, con acceso por nombre exacto cuando hay colisión. Un nombre sin proveedor aplica a todos los proveedores; usa `proveedor.tool` para acotarlo. Los hooks reciben una copia de los argumentos. Si una llamada vence por timeout, su efecto puede igual completarse (queda auditada como `outcome: "unknown"`), así que las herramientas de escritura deberían ser idempotentes.
+- La policy envuelve las funciones host **antes** de que el sandbox las vea, así que el código no puede saltarse la allowlist, las aprobaciones, la validación ni el presupuesto. Es fail-closed: una herramienta sin clasificar se deniega, y una escritura sin `approve` también. Sin colisión, los nombres se comparan sanitizados (`delete-user` = `delete_user`). Si coexisten variantes con el mismo sanitizado, `read`, `write` y `validate` requieren el nombre exacto: `"*"` no sustituye esa clasificación explícita. `deny` sigue denegando todas las variantes sanitizadas. Ambos servidores MCP omiten de los tipos y la descripción las variantes que colisionan y no están permitidas; las admitidas se anuncian por su nombre exacto. Un nombre sin proveedor aplica a todos los proveedores; usa `proveedor.tool` para acotarlo. Los hooks reciben una copia de los argumentos. Si una llamada vence por timeout, su efecto puede igual completarse (queda auditada como `outcome: "unknown"`), así que las herramientas de escritura deberían ser idempotentes.
 - `withPolicy` cierra los permisos al terminar `execute`, tanto en inline como en worker y pool: una aprobación tardía no puede iniciar una herramienta. El aprobador recibe `signal`, que se aborta al cierre. Las llamadas que ya empezaron pueden completarse; si su registro se emite después del cierre lleva `afterExecutionEnd: true`. `guardFns` usado por separado no conoce ese ciclo de vida y sus guards permanecen abiertos.
 - Las credenciales viven solo en las funciones host.
-- **Límites:** QuickJS-emscripten no está auditado (lo dice su propio autor). Un worker thread comparte proceso con el host, así que no es un límite de SO. Para código hostil, ejecuta el servidor además en un proceso o contenedor de bajo privilegio. El texto que devuelven las herramientas puede traer prompt injection: la descripción de la herramienta lo advierte al modelo, pero no se filtra. Detalle en RESEARCH.md §5 y §8.
+- **Límites:** QuickJS-emscripten no está auditado (lo dice su propio autor). Un worker thread comparte proceso con el host, así que no es un límite de SO. El primer intento de carga sostenida terminó con un **fallo nativo del proceso (`Segmentation fault`, exit 139)**; un segundo intento completó la carga, pero la causa sigue sin determinarse. Para código hostil, ejecuta el servidor además en un proceso o contenedor de bajo privilegio. El texto que devuelven las herramientas puede traer prompt injection: la descripción de la herramienta lo advierte al modelo, pero no se filtra. Evidencia y límites en [RESEARCH.md](RESEARCH.md) §5 y §8 y [bench/SOAK.json](bench/SOAK.json).
 
 ## Benchmark (`npm run bench`, datos sintéticos, MCP en memoria)
 
-Workflow: pedidos `pending` de clientes `gold` → ids, totales y suma. Mediana de 20 corridas. Resultados en `bench/RESULTS.json`.
+Workflow: pedidos `pending` de clientes `gold` → ids, totales y suma. 20 corridas por caso, Node v24.22.3. Resultados en [bench/RESULTS.json](bench/RESULTS.json).
 
 | Métrica | Baseline (llamadas individuales) | Code Mode | Tipo |
 |---|---|---|---|
 | Invocaciones a herramientas | 5 | 5 | medido |
 | Caracteres de resultados que llegan al modelo | 4 402 | 854 | medido |
-| Caracteres de definiciones de herramientas | 928 | 2 479 | medido |
-| Tiempo de herramientas + sandbox (mediana) | ~0,5 ms | ~94 ms (worker) / ~4,7 ms (pool en caliente) / ~4 ms (inline); p95: 125 / 6,8 / 5,6 ms | medido |
+| Caracteres de definiciones de herramientas | 928 | 2 436 | medido |
 | Resultado correcto | sí | sí | medido |
 | Ante un fallo (cliente no disponible) | error al modelo + 1 turno extra | resultado parcial + lista de fallos, en la misma llamada | medido |
 | Turnos del modelo | 6 (secuencial) / 4 (tool use paralelo) | 2 | derivado (script) |
-| Contexto acumulado estimado (sin contar la salida del modelo) | ~25 500 chars | ~6 500 chars | estimación |
+| Contexto acumulado estimado (incluye el código candidato) | 25 470 chars | 6 447 chars | estimación |
 | Tokens reales y latencia del modelo | — | — | **NOT_VERIFIED** |
 
-Code Mode **no** reduce las llamadas externas: reduce turnos y el volumen que llega al modelo. A cambio cuesta ~100 ms por ejecución con worker efímero (~5 ms con pool en caliente o inline) y una descripción de herramienta más larga. En flujos con modelo real, cada turno ahorrado suele costar mucho más que eso, pero esa latencia es NOT_VERIFIED aquí.
+| Ejecutor / condición | p50 (ms) | p95 (ms) |
+|---|---:|---:|
+| Baseline: llamadas individuales | 0,43 | 0,91 |
+| Worker efímero | 61,53 | 87,29 |
+| Pool caliente | 2,74 | 5,88 |
+| Pool tras error, con 150 ms de margen para el reemplazo | 6,07 | 7,94 |
+| Pool en frío, `prewarm: false` | 50,92 | 53,81 |
+| Inline | 2,44 | 4,64 |
+
+El margen de 150 ms del caso tras error queda fuera del intervalo medido. El caso frío crea un pool nuevo por muestra e incluye el arranque en `execute`. Las cifras describen esta máquina y esta carga; no son una promesa de latencia. Code Mode mantuvo las 5 llamadas externas y redujo el volumen enviado al modelo. El ahorro de turnos se deriva del script; tokens reales, tiempo del modelo y calidad del código generado siguen **NOT_VERIFIED**.
+
+El test existente de discovery, con 83 herramientas, midió 39 816 → 1 709 caracteres de `listTools`: **23,30×**, estable en tres corridas y con umbral de regresión de 20×. No es una medición de tokens.
+
+### Carga sostenida (`node bench/soak.ts`)
+
+Este bench es informativo y queda fuera de `test:all`. El segundo intento completó 5 000 ejecuciones por configuración, pool de tamaño 2, con 90 % OK, 5 % throw y 5 % timeout. Cada configuración terminó con 0 resultados inesperados y 502 workers creados. Las métricas completas y el primer intento fallido quedan en [bench/SOAK.json](bench/SOAK.json).
+
+| `maxUses` | RSS final / primer tramo | p95 final / primer tramo | Alertas de tendencia |
+|---|---:|---:|---|
+| 100 | 1,162× | 0,847× | Ninguna |
+| 1 000 | 1,023× | 1,126× | Ninguna |
+
+Los umbrales son RSS > 1,5× o p95 > 2×. El primer intento terminó con exit 139 antes de emitir una ventana de 500; su número de ejecuciones completadas es desconocido. Las comparaciones de 500 por configuración antes y después de M4 también pasaron, sin identificar la causa del crash. El reintento exitoso no demuestra estabilidad general. Los errores reciclan workers con frecuencia, por lo que esta mezcla tampoco valida 1 000 usos consecutivos exitosos por worker.
 
 ## Estructura
 
