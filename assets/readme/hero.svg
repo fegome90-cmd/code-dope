@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" width="1200" height="360" role="img" aria-labelledby="hero-title hero-desc">
+  <title id="hero-title">code-dope — Sandboxed Code Mode Library for AI Agents and MCP</title>
+  <desc id="hero-desc">Hero banner showing code-dope value proposition, verified PR #2 benchmark metrics, and the QuickJS-WASM JSON-only bridge and fail-closed policy gate architecture.</desc>
+
+  <rect x="0" y="0" width="1200" height="360" rx="20" fill="#0D1117" stroke="#30363D" stroke-width="1.5"/>
+
+  <!-- Subtle architectural grid accents -->
+  <g stroke="#30363D" stroke-opacity="0.35" stroke-width="1">
+    <line x1="610" y1="24" x2="610" y2="336"/>
+    <line x1="48" y1="88" x2="572" y2="88"/>
+  </g>
+
+  <!-- Left column: Category, Title, Value Proposition, Proof Pills -->
+  <rect x="48" y="38" width="296" height="32" rx="8" fill="#161B22" stroke="#30363D" stroke-width="1"/>
+  <text x="64" y="59" fill="#58A6FF" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="16" font-weight="600" letter-spacing="0.5">NODE.JS · MCP · QUICKJS-WASM</text>
+
+  <text x="48" y="152" fill="#F0F6FC" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="56" font-weight="700" letter-spacing="-1">code-dope</text>
+
+  <text x="48" y="198" fill="#F0F6FC" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="21" font-weight="500">Sandboxed Code Mode for AI agents &amp; MCP servers.</text>
+  <text x="48" y="228" fill="#8B949E" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="19">One isolated JS function replaces multi-turn tool chatter.</text>
+
+  <!-- Proof Pills (PR #2 verified benchmarks) -->
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="16" font-weight="600">
+    <rect x="48" y="272" width="212" height="38" rx="10" fill="#161B22" stroke="#3FB950" stroke-width="1.2"/>
+    <circle cx="68" cy="291" r="5" fill="#3FB950"/>
+    <text x="82" y="297" fill="#F0F6FC">-80.6% output</text>
+
+    <rect x="272" y="272" width="166" height="38" rx="10" fill="#161B22" stroke="#3FB950" stroke-width="1.2"/>
+    <text x="290" y="297" fill="#3FB950">Fail-closed</text>
+
+    <rect x="450" y="272" width="136" height="38" rx="10" fill="#161B22" stroke="#58A6FF" stroke-width="1.2"/>
+    <text x="468" y="297" fill="#58A6FF">env: {}</text>
+  </g>
+
+  <!-- Right column: Code Mode Sandbox Capsule Schematic -->
+  <rect x="636" y="32" width="520" height="296" rx="16" fill="#161B22" stroke="#30363D" stroke-width="1.2"/>
+  <text x="660" y="62" fill="#8B949E" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="16" font-weight="600">SANDBOX CAPSULE · HOST BOUNDARY (PR #2)</text>
+  <line x1="656" y1="76" x2="1136" y2="76" stroke="#30363D" stroke-width="1"/>
+
+  <!-- Node 1: Model JS -->
+  <rect x="660" y="94" width="212" height="66" rx="10" fill="#0D1117" stroke="#58A6FF" stroke-width="1.5"/>
+  <text x="676" y="120" fill="#58A6FF" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="18" font-weight="700">1. Model JS</text>
+  <text x="676" y="145" fill="#8B949E" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="16">async () =&gt; tools()</text>
+
+  <!-- Arrow 1 -> 2 -->
+  <line x1="872" y1="127" x2="906" y2="127" stroke="#58A6FF" stroke-width="2"/>
+  <polygon points="904,121 916,127 904,133" fill="#58A6FF"/>
+
+  <!-- Node 2: Worker / QuickJS-WASM -->
+  <rect x="916" y="94" width="216" height="66" rx="10" fill="#0D1117" stroke="#58A6FF" stroke-width="1.5"/>
+  <text x="932" y="120" fill="#F0F6FC" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="18" font-weight="700">2. QuickJS-WASM</text>
+  <text x="932" y="145" fill="#8B949E" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="16">Worker · 32 MiB</text>
+
+  <!-- JSON-only Bridge divider -->
+  <line x1="660" y1="186" x2="1132" y2="186" stroke="#8B949E" stroke-width="1.2" stroke-dasharray="6 6"/>
+  <rect x="808" y="170" width="180" height="32" rx="8" fill="#0D1117" stroke="#58A6FF" stroke-width="1.2"/>
+  <text x="826" y="191" fill="#58A6FF" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="16" font-weight="700">JSON &lt;-&gt; JSON</text>
+
+  <!-- Node 3: Policy Gate -->
+  <rect x="660" y="212" width="234" height="66" rx="10" fill="#0D1117" stroke="#3FB950" stroke-width="1.5"/>
+  <text x="676" y="238" fill="#3FB950" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="18" font-weight="700">3. withPolicy Gate</text>
+  <text x="676" y="263" fill="#8B949E" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="16">read | write+approve</text>
+
+  <!-- Arrow 3 -> 4 -->
+  <line x1="894" y1="245" x2="928" y2="245" stroke="#3FB950" stroke-width="2"/>
+  <polygon points="926,239 938,245 926,251" fill="#3FB950"/>
+
+  <!-- Node 4: Host Tools -->
+  <rect x="938" y="212" width="194" height="66" rx="10" fill="#0D1117" stroke="#30363D" stroke-width="1.5"/>
+  <text x="954" y="238" fill="#F0F6FC" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="18" font-weight="700">4. Host Tools</text>
+  <text x="954" y="263" fill="#8B949E" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="16">Host-only secrets</text>
+
+  <!-- Footer metric inside capsule -->
+  <text x="660" y="308" fill="#3FB950" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="18" font-weight="600">4,402 → 854 chars reaching model</text>
+  <text x="1032" y="308" fill="#8B949E" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="16">20 runs</text>
+</svg>
