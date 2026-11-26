@@ -1,0 +1,16 @@
+{
+  "name": "code-dope",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24 <25" },
+  "packageManager": "pnpm@11.25.0",
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "files": ["dist"],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc",
+    "test": "pnpm build && node --test scripts/package.test.mjs"
+  },
+  "devDependencies": { "typescript": "5.9.3" }
+}
