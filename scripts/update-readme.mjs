@@ -10,7 +10,8 @@
 
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join, posix } from "node:path";
+import { join, posix, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const IGNORED_DIRS = new Set([".git", "node_modules", "dist", "__pycache__"]);
 const IGNORED_FILES = new Set([".DS_Store"]);
@@ -95,21 +96,33 @@ function formatNumber(n) {
   return typeof n === "number" && Number.isFinite(n) ? n.toLocaleString("en-US") : String(n);
 }
 
-function parseGitLogLines(raw, limit = 5) {
+const GIT_LOG_FORMAT = "%h%x1f%cs%x1f%s%x1f%B%x1e";
+const SYNC_COMMIT_PATTERN =
+  /\[skip ci\]|docs\/sync-readme|docs\(readme\):\s*sync readme|^Auto-Sync:\s*readme\b/im;
+
+export function isSyncCommit(subject, body = "") {
+  return SYNC_COMMIT_PATTERN.test(`${subject ?? ""}\n${body ?? ""}`);
+}
+
+export function parseGitLogRecords(raw, limit = 5) {
   if (!raw) return [];
   const rows = [];
-  for (const line of raw.split("\n")) {
-    if (!line.trim()) continue;
-    const [sha = "", date = "", ...subjectParts] = line.split("\t");
-    const subject = subjectParts.join("\t").trim();
-    if (!sha || subject.includes("[skip ci]")) continue;
-    rows.push({ sha, date, subject });
+  for (const record of raw.split("\x1e")) {
+    const trimmedRecord = record.trim();
+    if (!trimmedRecord) continue;
+    const [sha = "", date = "", subject = "", ...bodyParts] = trimmedRecord.split("\x1f");
+    const cleanSha = sha.trim();
+    const cleanDate = date.trim();
+    const cleanSubject = subject.trim();
+    const cleanBody = bodyParts.join("\x1f").trim();
+    if (!cleanSha || isSyncCommit(cleanSubject, cleanBody)) continue;
+    rows.push({ sha: cleanSha, date: cleanDate, subject: cleanSubject });
     if (rows.length >= limit) break;
   }
   return rows;
 }
 
-function collectRepoState(root) {
+export function collectRepoState(root) {
   const pkg = readJsonIfExists(join(root, "package.json"));
   const nodeVersion = readTextIfExists(join(root, ".node-version"));
   const bench = readJsonIfExists(join(root, "bench", "RESULTS.json"));
@@ -121,15 +134,15 @@ function collectRepoState(root) {
   const testFiles = walkFiles(root, "tests");
   const scriptFiles = walkFiles(root, "scripts");
 
-  const headRaw = runGit(root, ["log", "-1", "--format=%h%x09%cs"]);
-  const [headSha = "0000000", headDate = "unknown"] = headRaw ? headRaw.split("\t") : [];
+  const logRaw = runGit(root, ["log", "-n", "50", `--format=${GIT_LOG_FORMAT}`]);
+  const headRecords = parseGitLogRecords(logRaw, 1);
+  const headSha = headRecords[0]?.sha || "0000000";
+  const headDate = headRecords[0]?.date || "unknown";
 
-  const mergesRaw = runGit(root, ["log", "--merges", "-n", "25", "--format=%h%x09%cs%x09%s"]);
-  const mergeRows = parseGitLogLines(mergesRaw, 5);
+  const mergesRaw = runGit(root, ["log", "--merges", "-n", "50", `--format=${GIT_LOG_FORMAT}`]);
+  const mergeRows = parseGitLogRecords(mergesRaw, 5);
   const usingFallbackCommits = mergeRows.length === 0;
-  const commitRows = usingFallbackCommits
-    ? parseGitLogLines(runGit(root, ["log", "-n", "25", "--format=%h%x09%cs%x09%s"]), 5)
-    : mergeRows;
+  const commitRows = usingFallbackCommits ? parseGitLogRecords(logRaw, 5) : mergeRows;
 
   const hasCoreLibrary =
     srcFiles.includes("src/policy.ts") ||
@@ -166,7 +179,7 @@ function collectRepoState(root) {
   };
 }
 
-function renderStatusBlock(state) {
+export function renderStatusBlock(state) {
   const { pkg, nodeTarget, srcFiles, exampleFiles, snippetFiles, testFiles, scriptFiles, headSha, headDate, hasCoreLibrary, hasBootstrapSrc } =
     state;
 
@@ -203,7 +216,7 @@ function summarizeFileList(files, limit = 6) {
   return shown.join(", ");
 }
 
-function renderModulesBlock(state) {
+export function renderModulesBlock(state) {
   const areas = [
     { name: "`src/`", files: state.srcFiles, pendingNote: "Pending merge (`PR #2 feat/code-mode-library`)" },
     { name: "`examples/`", files: state.exampleFiles, pendingNote: "Pending merge (`PR #2 feat/code-mode-library`)" },
@@ -225,7 +238,7 @@ function renderModulesBlock(state) {
   return rows.join("\n");
 }
 
-function renderBenchmarksBlock(state) {
+export function renderBenchmarksBlock(state) {
   const { bench, catalog } = state;
 
   if (!bench && !catalog) {
@@ -324,7 +337,7 @@ function renderBenchmarksBlock(state) {
   return lines.join("\n");
 }
 
-function renderRecentMergesBlock(state) {
+export function renderRecentMergesBlock(state) {
   const { commitRows, usingFallbackCommits } = state;
   const lines = [];
 
@@ -345,7 +358,7 @@ function renderRecentMergesBlock(state) {
   return lines.join("\n");
 }
 
-function renderSvgStatusInner(state) {
+export function renderSvgStatusInner(state) {
   const { pkg, srcFiles, testFiles, catalog, bench, headSha, headDate } = state;
 
   const mainState =
@@ -398,7 +411,7 @@ function renderSvgStatusInner(state) {
   return `  <g id="auto-status" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">\n${textNodes}\n  </g>`;
 }
 
-function replaceMarkerBlock(content, markerName, newInner, filePath) {
+export function replaceMarkerBlock(content, markerName, newInner, filePath) {
   const pattern = new RegExp(
     `([ \\t]*)<!-- AUTO:${markerName}:START -->[\\s\\S]*?([ \\t]*)<!-- AUTO:${markerName}:END -->`,
     "g",
@@ -416,7 +429,7 @@ function replaceMarkerBlock(content, markerName, newInner, filePath) {
   );
 }
 
-function main() {
+export function main() {
   const args = process.argv.slice(2);
   const checkOnly = args.includes("--check");
   const unknownArgs = args.filter((a) => a !== "--check");
@@ -485,4 +498,6 @@ function main() {
   }
 }
 
-main();
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
+  main();
+}

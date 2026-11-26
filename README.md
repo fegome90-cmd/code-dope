@@ -11,8 +11,8 @@
 | --- | --- |
 | Branch / Release | `v0.0.0` (`main`) |
 | Node.js Target | `>=24 <25 (.node-version: 24)` |
-| Tracked Files | 1 src · 0 examples/snippets · 0 tests · 6 scripts |
-| HEAD Commit | `7d2c8d1` (2026-11-26) |
+| Tracked Files | 1 src · 0 examples/snippets · 0 tests · 7 scripts |
+| HEAD Commit | `bf5057d` (2026-11-26) |
 | Core Library | Bootstrap on `main` (PR #2 pending) |
 <!-- AUTO:STATUS:END -->
 
@@ -55,7 +55,7 @@ Measured on Node `v22.23.5` (synthetic data, in-memory MCP, median of 20 runs in
 | `src/` | 1 | `src/index.ts` |
 | `examples/` | 0 | Pending merge (`PR #2 feat/code-mode-library`) |
 | `snippets/` | 0 | Pending merge (`PR #2 feat/code-mode-library`) |
-| `scripts/` | 6 | `scripts/check-docs.mjs`, `scripts/check-secrets.sh`, `scripts/package.test.mjs`, `scripts/scan-staged-secrets.mjs`, `scripts/scan-staged-secrets.test.mjs`, `scripts/update-readme.mjs` |
+| `scripts/` | 7 | `scripts/check-docs.mjs`, `scripts/check-secrets.sh`, `scripts/package.test.mjs`, `scripts/scan-staged-secrets.mjs`, `scripts/scan-staged-secrets.test.mjs`, `scripts/update-readme.mjs`, +1 more |
 <!-- AUTO:MODULES:END -->
 
 ---
@@ -171,21 +171,17 @@ Designed for defense-in-depth in PR #2 (`feat/code-mode-library`), with explicit
 ## Recent Merges & Commits
 
 <!-- AUTO:RECENT_MERGES:START -->
-Showing latest commits on `main` (no PR merge commits yet).
-
 | Commit | Date | Summary |
 | --- | --- | --- |
-| `7d2c8d1` | 2026-11-26 | fix(security): scan staged blobs from a fixed index snapshot (#4) |
-| `4d4ac6b` | 2026-11-26 | Bootstrap de Code Dope (#1) |
-| `148f09a` | 2026-11-26 | Initial commit |
+| `bf5057d` | 2026-11-26 | Merge pull request #6 from fegome90-cmd/docs/beautify-readme-auto-sync |
 <!-- AUTO:RECENT_MERGES:END -->
 
 ---
 
 ## Auto-Sync Workflow
 
-This repository keeps `README.md` and `assets/readme/status-badge.svg` synchronized with `main` automatically via `.github/workflows/update-readme.yml` and `scripts/update-readme.mjs`:
+This repository keeps `README.md` and `assets/readme/status-badge.svg` synchronized with protected `main` automatically via `.github/workflows/update-readme.yml` and `scripts/update-readme.mjs`:
 
-1. Every push to `main` (including PR merges) or manual `workflow_dispatch` runs `node scripts/update-readme.mjs` with `fetch-depth: 0`.
-2. The script deterministically refreshes the `AUTO:STATUS`, `AUTO:MODULES`, `AUTO:BENCHMARKS`, `AUTO:RECENT_MERGES`, and `AUTO:SVG_STATUS` blocks using live repository files and git commit metadata.
-3. If changes are detected, the workflow commits them with `[skip ci]` and skips re-triggering on `github-actions[bot]` or `[skip ci]` commits.
+1. Every push to `main` (including PR merges) or manual `workflow_dispatch` runs `node scripts/update-readme.mjs` with `fetch-depth: 0` (skipping commits authored by `github-actions[bot]` or carrying the `Auto-Sync: readme` trailer).
+2. The script deterministically refreshes `AUTO:STATUS`, `AUTO:MODULES`, `AUTO:BENCHMARKS`, `AUTO:RECENT_MERGES`, and `AUTO:SVG_STATUS` from live repository files and non-sync git history so sync merges converge to a fixed point.
+3. If `README.md` or `assets/readme/status-badge.svg` changed, the workflow force-pushes branch `docs/sync-readme` and opens or updates a PR targeting `main` using `secrets.README_SYNC_TOKEN` (required so the PR passes the repository ruleset and triggers the `Bootstrap` CI checks).
