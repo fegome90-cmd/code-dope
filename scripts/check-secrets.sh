@@ -4,7 +4,14 @@ cd -- "$(git rev-parse --show-toplevel)"
 command -v gitleaks >/dev/null || { echo 'Falta Gitleaks.' >&2; exit 1; }
 export GIT_NO_REPLACE_OBJECTS=1
 case ${1:-} in
-  staged) paths=(git diff --cached --diff-filter=ACMRT --name-only -z); flags=(--staged) ;;
+  staged)
+    umask 077
+    snapshot=$(mktemp -d "${TMPDIR:-/tmp}/code-dope-secrets.XXXXXXXX")
+    trap 'rm -rf -- "$snapshot"' EXIT
+    trap 'exit 1' HUP INT TERM
+    node scripts/scan-staged-secrets.mjs "$snapshot"
+    exit
+    ;;
   history)
     [[ "$(git rev-parse --is-shallow-repository)" == false ]] || { echo 'Se requiere el historial completo.' >&2; exit 1; }
     paths=(git log --full-history --name-only --format= --no-renames -z HEAD)
