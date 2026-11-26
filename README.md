@@ -12,7 +12,7 @@
 | Branch / Release | `v0.0.0` (`main`) |
 | Node.js Target | `>=24 <25 (.node-version: 24)` |
 | Tracked Files | 1 src · 0 examples/snippets · 0 tests · 7 scripts |
-| HEAD Commit | `bf5057d` (2026-11-26) |
+| HEAD Commit | `64492f8` (2026-11-26) |
 | Core Library | Bootstrap on `main` (PR #2 pending) |
 <!-- AUTO:STATUS:END -->
 
@@ -173,6 +173,7 @@ Designed for defense-in-depth in PR #2 (`feat/code-mode-library`), with explicit
 <!-- AUTO:RECENT_MERGES:START -->
 | Commit | Date | Summary |
 | --- | --- | --- |
+| `64492f8` | 2026-11-26 | Merge pull request #7 from fegome90-cmd/chore/readme-auto-sync-pr |
 | `bf5057d` | 2026-11-26 | Merge pull request #6 from fegome90-cmd/docs/beautify-readme-auto-sync |
 <!-- AUTO:RECENT_MERGES:END -->
 
