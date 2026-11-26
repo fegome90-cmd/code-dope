@@ -10,14 +10,24 @@ Para buscar un patrón según la tarea, ver **[`catalog/patterns.json`](catalog/
 
 ## Instalación
 
-Node ≥ 22.18 (el TS se ejecuta por type stripping, sin build).
+Node ≥ 22.18. En desarrollo se ejecutan las fuentes TS por type stripping; los consumidores cargan JavaScript y declaraciones desde `dist/`, incluido en Git.
 
 ```bash
-git clone <este repo> && cd code-dope && npm install
-npm run test:all      # tests JS + tests Python + typecheck
+git clone <este repo>
+cd code-dope
+npm ci
+npm run test:all      # deriva de dist + JS + Python + tipos + instalación del paquete
 ```
 
-Desde otro proyecto: `npm install git+ssh://git@github.com/fegome90-cmd/code-dope.git` e importar `code-dope` o `code-dope/mcp` (el repo es privado).
+Desde otro proyecto, fija un tag o commit que incluya `dist/`:
+
+```bash
+npm install 'git+ssh://git@github.com/fegome90-cmd/code-dope.git#<tag-o-commit>'
+```
+
+Importa `code-dope` o `code-dope/mcp`. No hay `prepare` ni compilación al instalar; el paquete no requiere permitir scripts de build en npm, pnpm o Bun. La instalación del tarball con npm se verifica en `test:pkg`; npm y pnpm desde Git tienen evidencia del prototipo D1, y Bun queda pendiente de ejecución directa. La autenticación de Git depende del acceso al repositorio.
+
+Tras modificar `src/`, ejecuta `npm run build` y agrega `src/` y `dist/` al mismo commit. `check:dist` reconstruye con TypeScript 5.9.3 y exige que `dist/` coincida con el índice de Git; agrega el build actualizado al índice antes de la verificación previa al commit. `test:pkg` instala un tarball en un directorio temporal y prueba inline, worker, pool y consumo TypeScript.
 
 ## Uso rápido
 

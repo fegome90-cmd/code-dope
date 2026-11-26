@@ -20,7 +20,7 @@ export interface WorkerExecutorOptions extends QuickJSExecutorOptions {
   killGraceMs?: number;
 }
 
-export const WORKER_ENTRY = new URL("./worker-entry.ts", import.meta.url);
+export const WORKER_ENTRY = new URL(import.meta.url.endsWith(".ts") ? "./worker-entry.ts" : "./worker-entry.js", import.meta.url);
 
 export class WorkerExecutor implements Executor {
   readonly #o: WorkerExecutorOptions;
