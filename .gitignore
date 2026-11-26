@@ -1,0 +1,26 @@
+# Node and generated packages
+node_modules/
+.pnpm-store/
+dist/
+coverage/
+*.tgz
+*.tsbuildinfo
+
+# Optional Python tooling
+.venv/
+__pycache__/
+*.py[cod]
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+
+# Local settings, secrets, logs and editor state
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.log
+.DS_Store
+.idea/
+.vscode/

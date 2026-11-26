@@ -1,0 +1,10 @@
+# Sólo configuración de tooling para scripts Python opcionales.
+# Code Dope no se distribuye como paquete Python ni lo requiere en ejecución.
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+force-exclude = true
+extend-exclude = ["dist", "node_modules"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
