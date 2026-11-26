@@ -1,0 +1,29 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: es
+reviews:
+  request_changes_workflow: false
+  auto_review:
+    enabled: true
+    drafts: false
+  path_instructions:
+    - path: "src/**"
+      instructions: |
+        Verifica que importar el núcleo no tenga efectos externos. Señala herramientas
+        o argumentos que evadan el catálogo, validación posterior a un efecto y
+        resultados globales que oculten fallos parciales.
+    - path: "scripts/**"
+      instructions: |
+        Comprueba que los ensayos fallen ante entradas inválidas y prueben el tarball
+        real, no el código fuente. No recomendar omitir tests ni mostrar secretos.
+    - path: "docs/**"
+      instructions: |
+        Contrasta lo que afirma el documento con el mismo SHA del PR. Distingue
+        propuesta, ejecución local e invocación real de MCP en Work.
+  pre_merge_checks:
+    custom_checks:
+      - name: "Contratos y evidencia"
+        mode: warning
+        instructions: |
+          Señala sólo discrepancias comprobables entre un contrato modificado y
+          el código, la prueba o la evidencia del mismo PR. Cita ruta y línea.
+          La revisión del bot no autoriza un merge ni sustituye a CI.
