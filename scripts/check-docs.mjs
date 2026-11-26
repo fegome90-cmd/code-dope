@@ -27,7 +27,7 @@ for (const file of docs) {
       try { path = posix.normalize(posix.join(dirname(file), decodeURIComponent(target.split(/[?#]/, 1)[0]))); }
       catch { path = null; }
       if (!path || target.startsWith("/") || path.startsWith("../") || (!tracked.has(path) && ![...tracked].some(p => p.startsWith(path.replace(/\/$/, "") + "/")))) {
-        console.error(`${file}:${i+1}: destino local no versionado: ${target}`);
+        console.error(`${file}:${i+1}: destino local no versionado`);
         failures++;
       }
     }
