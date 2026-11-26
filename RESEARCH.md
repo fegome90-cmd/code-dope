@@ -64,7 +64,7 @@ Código propio, por falta de una alternativa compatible: `QuickJSExecutor`, `pol
 ## 5. Riesgos de seguridad conocidos
 
 - QuickJS-emscripten no está auditado [A, README del proyecto]. Mitigación: sin handles del host en el guest, solo strings JSON, límites de memoria, stack y tiempo. Para código hostil, usar además un proceso separado o un contenedor.
-- La ejecución de QuickJS es síncrona en el hilo de Node: un bucle de CPU bloquea el event loop hasta el deadline del interrupt handler. [I + R: el bucle se corta al llegar al timeout]
+- Modo `inline`: la ejecución de QuickJS es síncrona en el hilo de Node, así que un bucle de CPU bloquea el event loop hasta el deadline [R, S3]. El modo `worker` (por defecto) lo evita a cambio de ~100 ms por ejecución [R]. Un worker comparte proceso, no es un límite de SO.
 - El límite de memoria se cumple ("out of memory") [R], pero con heaps grandes el GC puede tardar segundos y el timeout llega antes [R].
 - Las herramientas upstream son una fuente de prompt injection: sus descripciones se insertan en las descripciones de las herramientas. El generador de Cloudflare escapa JSDoc [O]. La policy acota lo que el código inyectado puede hacer.
 
@@ -72,9 +72,51 @@ Código propio, por falta de una alternativa compatible: `QuickJSExecutor`, `pol
 
 Ver `tests/` y `bench/RESULTS.json`. Benchmark resumido en el README. Las cifras de terceros (98,7 % de Anthropic, 99,9 % de Cloudflare, 67-88 % de UTCP) **no** se usan como resultados propios.
 
-## 7. Preguntas abiertas
+## 7. Revisión independiente (Sonnet, S3) y correcciones
+
+Revisión con unas 45 sondas ejecutadas, sin acceso al veredicto de Opus. Todos los hallazgos marcados como reproducidos se corrigieron y tienen prueba de regresión en `tests/review-regressions.test.ts`.
+
+| ID | Hallazgo | Corrección |
+|---|---|---|
+| C1 | El desbordamiento de stack del guest dejaba inservible el módulo WASM del proceso (después de ~9 veces, todo fallaba) [R] | El módulo se recicla cuando la limpieza falla, y en el modo worker por defecto el estado muere con el worker [R: 20 desbordamientos y luego OK] |
+| H1 | Presupuesto de llamadas evadido con `approve` asíncrono y llamadas concurrentes [R] | El cupo se reserva de forma síncrona antes del primer `await` |
+| H2 | `deny`/`validate` con nombres originales (`delete-user`) no aplicaban en search/execute [R] | Comparación de nombres sanitizada en ambos lados; fns indexadas por el nombre original; la búsqueda solo muestra herramientas permitidas |
+| H3 | Un bucle de CPU bloqueaba el event loop del host [R] | `WorkerExecutor` es ahora el executor por defecto [R: el host sigue con ticks durante el bucle] |
+| M1 | Los nombres sanitizados que anuncia `codeMcpServer` no resolvían [R] | El executor resuelve los alias sanitizados |
+| M2 | El log de auditoría crecía sin límite [R] | `createAuditLog(max=1000)` + contador `dropped` |
+| M3 | Una escritura vencida por timeout podía completarse y quedaba auditada como fallida [R] | `outcome: "unknown"` y mensaje explícito; documentado que las escrituras deberían ser idempotentes |
+| M4 | Hooks que lanzaban excepción no dejaban registro de auditoría [R] | Se capturan y se registran como denegación |
+| M5 | El aprobador podía mutar los argumentos ejecutados [R] | Los hooks reciben `structuredClone` |
+| M6 | Un nombre sin proveedor aplica a todos los proveedores | Documentado (`proveedor.tool` para acotar) |
+| M7 | ArrayBuffer desacoplado con más de 20 000 llamadas en vuelo [R] | Tope `maxPendingCalls` (64) |
+| M8 | Un resultado muy anidado rompía la serialización del host [R] | Verificación de serialización en el executor y `try/catch` en discovery |
+| M9 | Un comentario final rompía el wrapper [R] | Salto de línea antes de `)` |
+| L1–L3 | `patch` podía pisar el id; recipes no null-safe; `ok: true` con resultado truncado; cursor repetido | Validación en build, null-safe, `ok: !truncated`, detección de `stalled` |
+| L4 | Ranking sin prefijos; una consulta vacía devolvía herramientas | Coincidencia por prefijo de 3+ caracteres; consulta vacía → nada |
+| L5 | `unwrap` sin la rama `toolResult` | Agregada |
+| L6 | Prompt injection desde herramientas | Advertencia en las descripciones; sin filtrado (riesgo residual) |
+| L7 | `retry` reintentaba denegaciones | Las denegaciones no se reintentan |
+| L8 | Prefijo `[error]` falsificable en logs; sin tope de ejecuciones concurrentes | Riesgo residual documentado |
+| L9 | Metodología del benchmark (acumulado adelantado un turno, percentiles) | Corregida y benchmark re-ejecutado |
+
+## 8. Preguntas abiertas
 
 - Si Haiku 5.5 soporta PTC no está confirmado (H2). Verificarlo con la Models API antes de usar el snippet con ese modelo.
 - Advisory de isolated-vm (GHSA-864f-rcv7-6rh4): sin verificar en la fuente primaria. Solo importa si alguien elige isolated-vm.
 - Si un modelo real escribe código correcto contra estos helpers: NOT_VERIFIED. No hubo modelo en el loop.
 - Aprobaciones asíncronas o diferidas (pausar y reanudar) en Node: fuera del alcance actual.
+
+## 9. Evidencia de delegación
+
+Lanzados con la herramienta Agent del entorno, tipo `Explore` (sin Edit/Write/NotebookEdit ni Agent, es decir, solo lectura y sin redelegación), con `model` forzado. El modelo autodeclarado en la primera línea de cada informe coincide con el forzado. La autodeclaración por sí sola es evidencia débil; la configuración efectiva es el parámetro `model` del harness. Las métricas son las que devolvió el harness.
+
+| Tarea | Modelo solicitado / autodeclarado | Estado | Uso de herramientas | Duración | Aporte decisivo |
+|---|---|---|---|---|---|
+| H1 docs Cloudflare | haiku / claude-haiku-5-5 | DONE | 5 | 69 s | Estado experimental; API actual frente a la del blog 2025 (obsoleta) |
+| H2 docs Anthropic | haiku / claude-haiku-5-5 | DONE | 9 | 82 s | Contrato PTC (dict → string), tool types, límites |
+| H3 inventario ecosistema | haiku / claude-haiku-5-5 | DONE | 29 | 100 s | Opciones de sandbox para Node y licencias |
+| S1 código @cloudflare/codemode | sonnet / claude-sonnet-5-5 | DONE | 14 | 86 s | No hay executor para Node; módulos portables; `./mcp` reutilizable |
+| S2 código UTCP + seguridad | sonnet / claude-sonnet-5-5 | DONE | 13 | 116 s | `register_manual` crítico; Python sin aislamiento; descartar como dependencia |
+| S3 revisión independiente | sonnet / claude-sonnet-5-5 | DONE | 21 (~45 sondas) | 381 s | C1, H1–H3, M1–M9 (ver §7) |
+
+Opus verificó por su cuenta los hallazgos decisivos: la falla de import de la raíz y la carga de `./mcp` en Node [R], el contrato `Executor` [O] y la reproducción de cada hallazgo de S3 como prueba de regresión [R].

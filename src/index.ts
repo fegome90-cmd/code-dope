@@ -1,4 +1,6 @@
 export { QuickJSExecutor, type QuickJSExecutorOptions } from "./executor/quickjs-executor.ts";
+export { WorkerExecutor, type WorkerExecutorOptions } from "./executor/worker-executor.ts";
+export { createDefaultExecutor, type Isolation } from "./executor/default.ts";
 export {
   withPolicy,
   guardFns,

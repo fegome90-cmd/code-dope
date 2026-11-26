@@ -24,8 +24,9 @@
  * separate process/container as well.
  */
 import {
-  getQuickJS,
+  newQuickJSWASMModule,
   shouldInterruptAfterDeadline,
+  type QuickJSWASMModule,
   type QuickJSContext,
   type QuickJSDeferredPromise,
   type QuickJSHandle,
@@ -36,6 +37,21 @@ import type {
   ResolvedProvider,
 } from "@cloudflare/codemode";
 import { normalizeCode } from "../vendor/cf-normalize.ts";
+import { sanitizeToolName } from "../vendor/cf-utils.ts";
+
+// One WASM module per process, replaced whenever a run leaves it in a bad
+// state (e.g. a guest stack overflow aborts JS_FreeRuntime). A module that
+// failed to clean up is never reused.
+let modulePromise: Promise<QuickJSWASMModule> | null = null;
+function getModule(): Promise<QuickJSWASMModule> {
+  modulePromise ??= newQuickJSWASMModule();
+  return modulePromise;
+}
+function discardModule(m: QuickJSWASMModule): void {
+  void modulePromise?.then((cur) => {
+    if (cur === m) modulePromise = null;
+  });
+}
 
 export interface QuickJSExecutorOptions {
   /** Wall-clock limit for the whole execution, including waits on tools. Default 30_000. */
@@ -48,6 +64,8 @@ export interface QuickJSExecutorOptions {
   maxLogLines?: number;
   /** Maximum characters per console line. Default 2_000. */
   maxLogLineChars?: number;
+  /** Maximum tool calls in flight at once inside one execution. Default 64. */
+  maxPendingCalls?: number;
   /**
    * Trusted JavaScript evaluated in the guest before user code, after the
    * provider namespaces exist (e.g. `SANDBOX_HELPERS` from ../helpers.ts).
@@ -80,6 +98,7 @@ export class QuickJSExecutor implements Executor {
       maxStackBytes: options.maxStackBytes ?? 512 * 1024,
       maxLogLines: options.maxLogLines ?? 200,
       maxLogLineChars: options.maxLogLineChars ?? 2_000,
+      maxPendingCalls: options.maxPendingCalls ?? 64,
       preludes: options.preludes ?? [],
     };
   }
@@ -96,7 +115,8 @@ export class QuickJSExecutor implements Executor {
       return { result: undefined, error: errMsg(e), logs };
     }
 
-    const QuickJS = await getQuickJS();
+    const QuickJS = await getModule();
+    let poisoned = false;
     const runtime = QuickJS.newRuntime();
     runtime.setMemoryLimit(this.#o.memoryLimitBytes);
     runtime.setMaxStackSize(this.#o.maxStackBytes);
@@ -128,11 +148,34 @@ export class QuickJSExecutor implements Executor {
 
       // tool bridge: (provider, tool, argsJson) -> Promise<envelopeJson>
       const byName = new Map(providers.map((p) => [p.name, p.fns]));
+      // Types advertise sanitized names (e.g. get-user → get_user); resolve them back.
+      const aliases = new Map(
+        providers.map((p) => {
+          const m = new Map<string, string>();
+          const dup = new Set<string>();
+          for (const k of Object.keys(p.fns)) {
+            const a = sanitizeToolName(k);
+            if (a === k) continue;
+            if (m.has(a) || Object.hasOwn(p.fns, a)) dup.add(a);
+            else m.set(a, k);
+          }
+          for (const d of dup) m.delete(d);
+          return [p.name, m];
+        }),
+      );
       const hostFn = vm.newFunction("__cd_host", (provH, toolH, argsH) => {
         const prov = vm.getString(provH);
         const tool = vm.getString(toolH);
         const argsJson = vm.getString(argsH);
         const deferred = vm.newPromise();
+        if (pending.size >= this.#o.maxPendingCalls) {
+          const h = vm.newString(JSON.stringify({ ok: false, error: `Too many concurrent tool calls (limit ${this.#o.maxPendingCalls}); use helpers.parallel with a concurrency limit` }));
+          deferred.resolve(h);
+          h.dispose();
+          const handle = deferred.handle;
+          queueMicrotask(pump);
+          return handle;
+        }
         pending.add(deferred);
         const settle = (envelope: unknown) => {
           if (disposed) return;
@@ -150,11 +193,12 @@ export class QuickJSExecutor implements Executor {
         };
         (async () => {
           const fns = byName.get(prov);
-          if (!fns || !Object.hasOwn(fns, tool) || typeof fns[tool] !== "function") {
+          const key = fns && Object.hasOwn(fns, tool) ? tool : aliases.get(prov)?.get(tool);
+          if (!fns || key === undefined || typeof fns[key] !== "function") {
             throw new Error(`Unknown tool: ${prov}.${tool}`);
           }
           const args = argsJson === "" ? undefined : JSON.parse(argsJson);
-          return fns[tool](args);
+          return fns[key](args);
         })().then(
           (value) => settle({ ok: true, value: value === undefined ? null : value }),
           (e) => settle({ ok: false, error: errMsg(e) }),
@@ -190,13 +234,15 @@ export class QuickJSExecutor implements Executor {
         if (r.error) {
           const err = vm.dump(r.error);
           r.error.dispose();
+          poisoned ||= errMsg(err) === "" || errMsg(err) === "undefined";
           throw new Error(`Prelude failed: ${errMsg(err)}`);
         }
         r.value.dispose();
       }
 
       const normalized = normalizeCode(code);
-      const program = `(async () => { const __r = await (${normalized})(); return __r === undefined ? "__cd_undefined__" : JSON.stringify(__r); })()`;
+      const program = `(async () => { const __r = await (${normalized}
+)(); return __r === undefined ? "__cd_undefined__" : JSON.stringify(__r); })()`;
       const evaluated = vm.evalCode(program, "user-code.js");
       if (evaluated.error) {
         const err = vm.dump(evaluated.error);
@@ -223,17 +269,25 @@ export class QuickJSExecutor implements Executor {
       }
       const text = vm.getString(outcome.value);
       outcome.value.dispose();
-      return { result: text === "__cd_undefined__" ? undefined : JSON.parse(text), logs };
+      if (text === "__cd_undefined__") return { result: undefined, logs };
+      const result: unknown = JSON.parse(text);
+      try {
+        JSON.stringify(result); // downstream hosts will serialize it again
+      } catch {
+        return { result: undefined, error: "Result is too deeply nested to serialize; flatten it before returning", logs };
+      }
+      return { result, logs };
     } catch (e) {
       return { result: undefined, error: errMsg(e), logs };
     } finally {
       if (timer) clearTimeout(timer);
       disposed = true;
       for (const d of pending) {
-        try { d.dispose(); } catch { /* already gone */ }
+        try { d.dispose(); } catch { poisoned = true; }
       }
-      try { vm.dispose(); } catch { /* leaked handles on abort; runtime freed below */ }
-      try { runtime.dispose(); } catch { /* idem */ }
+      try { vm.dispose(); } catch { poisoned = true; }
+      try { runtime.dispose(); } catch { poisoned = true; }
+      if (poisoned) discardModule(QuickJS);
     }
   }
 }

@@ -2,40 +2,287 @@
   "$comment": "Agent-readable index. Find a pattern by `tasks`, then open `source`. Levels: 1 = snippet for hosts with native Code Mode, 2 = module for plugins/MCP servers, 3 = execution runtime for hosts without Code Mode.",
   "version": "0.1.0",
   "patterns": [
-    { "id": "mcp-code-tool", "level": 2, "tasks": ["wrap an MCP server", "expose tools as code", "code mode for MCP", "reduce tool round-trips"],
-      "source": "src/mcp.ts#createCodeModeMcpServer", "deps": ["@cloudflare/codemode/mcp", "@modelcontextprotocol/sdk", "quickjs-emscripten"],
-      "env": ["node>=22.18"], "permissions": "policy.read/write lists; writes need approve()", "test": "tests/mcp.test.ts",
-      "provenance": "codeMcpServer reused from @cloudflare/codemode 0.5.6 (MIT); executor+policy own code" },
-    { "id": "search-execute-server", "level": 2, "tasks": ["large tool catalog", "progressive discovery", "tool search", "don't load all schemas"],
-      "source": "src/discovery.ts#createSearchExecuteMcpServer", "deps": ["@modelcontextprotocol/sdk", "quickjs-emscripten"],
-      "env": ["node>=22.18"], "permissions": "same policy as mcp-code-tool", "test": "tests/discovery.test.ts",
-      "provenance": "pattern: Cloudflare search/execute + Anthropic Tool Search; type generator vendored from Cloudflare (MIT); lexical ranking own code" },
-    { "id": "search-tools", "level": 2, "tasks": ["rank tools for a query", "selective schema fetch", "types for a subset of tools"],
-      "source": "src/discovery.ts#searchTools,typesFor", "deps": [], "env": ["any JS"], "permissions": "none", "test": "tests/discovery.test.ts", "provenance": "own code + vendored Cloudflare generateTypesFromJsonSchema" },
-    { "id": "code-runner", "level": 2, "tasks": ["plugin with in-process tools", "run model code without MCP", "add code mode to a plugin"],
-      "source": "src/runner.ts#createCodeRunner", "deps": ["quickjs-emscripten"], "env": ["node>=22.18"], "permissions": "policy", "test": "tests/plugin.test.ts", "provenance": "own code" },
-    { "id": "quickjs-executor", "level": 3, "tasks": ["sandbox model-generated JavaScript in Node", "Executor for @cloudflare/codemode outside Workers"],
-      "source": "src/executor/quickjs-executor.ts#QuickJSExecutor", "deps": ["quickjs-emscripten 0.32.0 (MIT)"], "env": ["node>=22.18"],
-      "permissions": "guest has no fs/net/process/timers; only JSON tool bridge", "test": "tests/executor.test.ts",
-      "provenance": "own code implementing Cloudflare Executor contract (executor-types.ts @841b6fc)" },
-    { "id": "policy", "level": 2, "tasks": ["allowlist tools", "approve writes", "validate arguments", "call budget", "per-call timeout", "audit log", "block unauthorized operations"],
-      "source": "src/policy.ts#withPolicy,guardFns,createAuditLog", "deps": [], "env": ["any JS"], "permissions": "fail-closed: unclassified denied, writes need approve()", "test": "tests/policy.test.ts", "provenance": "own code; gaps identified in UTCP (no allowlist/validation/budget)" },
-    { "id": "parallel", "level": 1, "tasks": ["independent calls in parallel", "bounded concurrency", "partial results"],
-      "source": "src/sandbox/helpers.js#parallel,settle | snippets/ptc_helpers.py#parallel", "deps": [], "env": ["any Code Mode sandbox", "Claude PTC (python)"], "permissions": "none", "test": "tests/helpers-recipes.test.ts; tests/test_ptc_helpers.py", "provenance": "own code" },
-    { "id": "paginate", "level": 1, "tasks": ["cursor pagination", "fetch all pages", "page limit"],
-      "source": "src/sandbox/helpers.js#paginate | snippets/ptc_helpers.py#paginate", "deps": [], "env": ["any Code Mode sandbox", "Claude PTC"], "permissions": "none", "test": "same", "provenance": "own code" },
-    { "id": "filter-before-return", "level": 1, "tasks": ["reduce output to model", "filter results", "project fields", "summarize", "group counts"],
-      "source": "src/sandbox/helpers.js#pick,where,summarize,countBy | snippets/ptc_helpers.py", "deps": [], "env": ["any Code Mode sandbox", "Claude PTC"], "permissions": "none", "test": "same", "provenance": "own code; pattern from Anthropic code-execution-with-mcp" },
-    { "id": "retry-idempotent", "level": 1, "tasks": ["retry transient failures", "safe retries"],
-      "source": "src/sandbox/helpers.js#retry | snippets/ptc_helpers.py#retry", "deps": [], "env": ["any"], "permissions": "use on read tools only", "test": "same", "provenance": "own code" },
-    { "id": "batch", "level": 1, "tasks": ["process in chunks", "batch operations"], "source": "src/sandbox/helpers.js#batch", "deps": [], "env": ["any Code Mode sandbox"], "permissions": "none", "test": "none (trivial)", "provenance": "own code" },
-    { "id": "evidence-and-structured-result", "level": 1, "tasks": ["structured output", "execution evidence", "report what happened"],
-      "source": "src/sandbox/helpers.js#evidence,result,requireFields", "deps": [], "env": ["any Code Mode sandbox"], "permissions": "none", "test": "tests/helpers-recipes.test.ts", "provenance": "own code" },
-    { "id": "recipe-paginated-filter", "level": 2, "tasks": ["list everything and filter", "count matching items", "report by group"],
-      "source": "src/recipes.ts#paginatedFilter", "deps": ["helpers"], "env": ["any Code Mode sandbox with helpers"], "permissions": "read tool", "test": "tests/mcp.test.ts (reused on 2 servers)", "provenance": "own code" },
-    { "id": "recipe-fan-out-enrich", "level": 2, "tasks": ["list then fetch details", "enrich items", "N+1 lookups"],
-      "source": "src/recipes.ts#fanOutEnrich", "deps": ["helpers"], "env": ["same"], "permissions": "read tools", "test": "tests/helpers-recipes.test.ts", "provenance": "own code" },
-    { "id": "recipe-guarded-bulk-update", "level": 2, "tasks": ["bulk write", "update many", "dry run", "controlled writes"],
-      "source": "src/recipes.ts#guardedBulkUpdate", "deps": ["helpers"], "env": ["same"], "permissions": "write tool + approval", "test": "tests/helpers-recipes.test.ts", "provenance": "own code" }
+    {
+      "id": "mcp-code-tool",
+      "level": 2,
+      "tasks": [
+        "wrap an MCP server",
+        "expose tools as code",
+        "code mode for MCP",
+        "reduce tool round-trips"
+      ],
+      "source": "src/mcp.ts#createCodeModeMcpServer",
+      "deps": [
+        "@cloudflare/codemode/mcp",
+        "@modelcontextprotocol/sdk",
+        "quickjs-emscripten"
+      ],
+      "env": [
+        "node>=22.18"
+      ],
+      "permissions": "policy.read/write lists; writes need approve()",
+      "test": "tests/mcp.test.ts",
+      "provenance": "codeMcpServer reused from @cloudflare/codemode 0.5.6 (MIT); executor+policy own code"
+    },
+    {
+      "id": "search-execute-server",
+      "level": 2,
+      "tasks": [
+        "large tool catalog",
+        "progressive discovery",
+        "tool search",
+        "don't load all schemas"
+      ],
+      "source": "src/discovery.ts#createSearchExecuteMcpServer",
+      "deps": [
+        "@modelcontextprotocol/sdk",
+        "quickjs-emscripten"
+      ],
+      "env": [
+        "node>=22.18"
+      ],
+      "permissions": "same policy as mcp-code-tool",
+      "test": "tests/discovery.test.ts",
+      "provenance": "pattern: Cloudflare search/execute + Anthropic Tool Search; type generator vendored from Cloudflare (MIT); lexical ranking own code"
+    },
+    {
+      "id": "search-tools",
+      "level": 2,
+      "tasks": [
+        "rank tools for a query",
+        "selective schema fetch",
+        "types for a subset of tools"
+      ],
+      "source": "src/discovery.ts#searchTools,typesFor",
+      "deps": [],
+      "env": [
+        "any JS"
+      ],
+      "permissions": "none",
+      "test": "tests/discovery.test.ts",
+      "provenance": "own code + vendored Cloudflare generateTypesFromJsonSchema"
+    },
+    {
+      "id": "code-runner",
+      "level": 2,
+      "tasks": [
+        "plugin with in-process tools",
+        "run model code without MCP",
+        "add code mode to a plugin"
+      ],
+      "source": "src/runner.ts#createCodeRunner",
+      "deps": [
+        "quickjs-emscripten"
+      ],
+      "env": [
+        "node>=22.18"
+      ],
+      "permissions": "policy",
+      "test": "tests/plugin.test.ts",
+      "provenance": "own code"
+    },
+    {
+      "id": "sandbox-executors",
+      "level": 3,
+      "tasks": [
+        "sandbox model-generated JavaScript in Node",
+        "Executor for @cloudflare/codemode outside Workers",
+        "don't block the host event loop"
+      ],
+      "source": "src/executor/worker-executor.ts#WorkerExecutor (default), src/executor/quickjs-executor.ts#QuickJSExecutor (inline), src/executor/default.ts#createDefaultExecutor",
+      "deps": [
+        "quickjs-emscripten 0.32.0 (MIT)"
+      ],
+      "env": [
+        "node>=22.18"
+      ],
+      "permissions": "guest has no fs/net/process/timers; only JSON tool bridge; worker env is empty",
+      "test": "tests/executor.test.ts, tests/review-regressions.test.ts",
+      "provenance": "own code implementing Cloudflare Executor contract (executor-types.ts @841b6fc)"
+    },
+    {
+      "id": "policy",
+      "level": 2,
+      "tasks": [
+        "allowlist tools",
+        "approve writes",
+        "validate arguments",
+        "call budget",
+        "per-call timeout",
+        "audit log",
+        "block unauthorized operations"
+      ],
+      "source": "src/policy.ts#withPolicy,guardFns,createAuditLog",
+      "deps": [],
+      "env": [
+        "any JS"
+      ],
+      "permissions": "fail-closed: unclassified denied, writes need approve()",
+      "test": "tests/policy.test.ts",
+      "provenance": "own code; gaps identified in UTCP (no allowlist/validation/budget)"
+    },
+    {
+      "id": "parallel",
+      "level": 1,
+      "tasks": [
+        "independent calls in parallel",
+        "bounded concurrency",
+        "partial results"
+      ],
+      "source": "src/sandbox/helpers.js#parallel,settle | snippets/ptc_helpers.py#parallel",
+      "deps": [],
+      "env": [
+        "any Code Mode sandbox",
+        "Claude PTC (python)"
+      ],
+      "permissions": "none",
+      "test": "tests/helpers-recipes.test.ts; tests/test_ptc_helpers.py",
+      "provenance": "own code"
+    },
+    {
+      "id": "paginate",
+      "level": 1,
+      "tasks": [
+        "cursor pagination",
+        "fetch all pages",
+        "page limit"
+      ],
+      "source": "src/sandbox/helpers.js#paginate | snippets/ptc_helpers.py#paginate",
+      "deps": [],
+      "env": [
+        "any Code Mode sandbox",
+        "Claude PTC"
+      ],
+      "permissions": "none",
+      "test": "same",
+      "provenance": "own code"
+    },
+    {
+      "id": "filter-before-return",
+      "level": 1,
+      "tasks": [
+        "reduce output to model",
+        "filter results",
+        "project fields",
+        "summarize",
+        "group counts"
+      ],
+      "source": "src/sandbox/helpers.js#pick,where,summarize,countBy | snippets/ptc_helpers.py",
+      "deps": [],
+      "env": [
+        "any Code Mode sandbox",
+        "Claude PTC"
+      ],
+      "permissions": "none",
+      "test": "same",
+      "provenance": "own code; pattern from Anthropic code-execution-with-mcp"
+    },
+    {
+      "id": "retry-idempotent",
+      "level": 1,
+      "tasks": [
+        "retry transient failures",
+        "safe retries"
+      ],
+      "source": "src/sandbox/helpers.js#retry | snippets/ptc_helpers.py#retry",
+      "deps": [],
+      "env": [
+        "any"
+      ],
+      "permissions": "use on read tools only",
+      "test": "same",
+      "provenance": "own code"
+    },
+    {
+      "id": "batch",
+      "level": 1,
+      "tasks": [
+        "process in chunks",
+        "batch operations"
+      ],
+      "source": "src/sandbox/helpers.js#batch",
+      "deps": [],
+      "env": [
+        "any Code Mode sandbox"
+      ],
+      "permissions": "none",
+      "test": "none (trivial)",
+      "provenance": "own code"
+    },
+    {
+      "id": "evidence-and-structured-result",
+      "level": 1,
+      "tasks": [
+        "structured output",
+        "execution evidence",
+        "report what happened"
+      ],
+      "source": "src/sandbox/helpers.js#evidence,result,requireFields",
+      "deps": [],
+      "env": [
+        "any Code Mode sandbox"
+      ],
+      "permissions": "none",
+      "test": "tests/helpers-recipes.test.ts",
+      "provenance": "own code"
+    },
+    {
+      "id": "recipe-paginated-filter",
+      "level": 2,
+      "tasks": [
+        "list everything and filter",
+        "count matching items",
+        "report by group"
+      ],
+      "source": "src/recipes.ts#paginatedFilter",
+      "deps": [
+        "helpers"
+      ],
+      "env": [
+        "any Code Mode sandbox with helpers"
+      ],
+      "permissions": "read tool",
+      "test": "tests/mcp.test.ts (reused on 2 servers)",
+      "provenance": "own code"
+    },
+    {
+      "id": "recipe-fan-out-enrich",
+      "level": 2,
+      "tasks": [
+        "list then fetch details",
+        "enrich items",
+        "N+1 lookups"
+      ],
+      "source": "src/recipes.ts#fanOutEnrich",
+      "deps": [
+        "helpers"
+      ],
+      "env": [
+        "same"
+      ],
+      "permissions": "read tools",
+      "test": "tests/helpers-recipes.test.ts",
+      "provenance": "own code"
+    },
+    {
+      "id": "recipe-guarded-bulk-update",
+      "level": 2,
+      "tasks": [
+        "bulk write",
+        "update many",
+        "dry run",
+        "controlled writes"
+      ],
+      "source": "src/recipes.ts#guardedBulkUpdate",
+      "deps": [
+        "helpers"
+      ],
+      "env": [
+        "same"
+      ],
+      "permissions": "write tool + approval",
+      "test": "tests/helpers-recipes.test.ts",
+      "provenance": "own code"
+    }
   ]
 }

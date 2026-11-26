@@ -1,6 +1,6 @@
 {
   "workflow": "pending orders of gold-tier customers -> ids, totals, sum (synthetic data, in-memory MCP)",
-  "date": "2026-11-26T10:21:36.216Z",
+  "date": "2026-11-26T10:33:36.061Z",
   "node": "v22.23.5",
   "runs": 20,
   "measured": {
@@ -14,20 +14,27 @@
     },
     "toolDefinitionChars": {
       "baseline": 928,
-      "candidate": 2400
+      "candidate": 2479
     },
     "candidateCodeChars_modelOutput": 721,
     "toolWallClockMsMedian": {
-      "baseline": 0.34,
-      "candidate": 4.14,
-      "baselineP10P90": [
-        0.26,
-        0.65
-      ],
-      "candidateP10P90": [
-        2.89,
-        9.21
-      ]
+      "baseline": 0.4,
+      "candidateWorker": 101.14,
+      "candidateInline": 5.04,
+      "p10p90": {
+        "baseline": [
+          0.3,
+          0.68
+        ],
+        "candidateWorker": [
+          87.09,
+          117.86
+        ],
+        "candidateInline": [
+          3.25,
+          10.2
+        ]
+      }
     },
     "correct": {
       "baseline": true,
@@ -57,8 +64,8 @@
       "candidate": 2
     },
     "cumulativeContextCharsEstimate": {
-      "baselineSequential": 29872,
-      "candidate": 7229
+      "baselineSequential": 25470,
+      "candidate": 6533
     }
   },
   "NOT_VERIFIED": [

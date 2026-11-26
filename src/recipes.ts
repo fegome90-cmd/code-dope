@@ -51,7 +51,7 @@ export const paginatedFilter: Recipe<PaginatedFilterParams> = {
   const fields = ${J(p.fields ?? null)};
   const projected = fields ? helpers.pick(filtered, fields) : filtered;
   const groupBy = ${J(p.groupBy ?? null)};
-  return helpers.result(helpers.summarize(projected, { sample: ${J(p.sample ?? 5)} }), {
+  return helpers.result(helpers.summarize(projected, { sample: ${J(p.sample ?? 5)} }), { ok: !all.truncated,
     groups: groupBy ? helpers.countBy(filtered, groupBy) : undefined,
     truncated: all.truncated, evidence: ev.steps });
 }`;
@@ -84,7 +84,7 @@ export const fanOutEnrich: Recipe<FanOutEnrichParams> = {
     return `async () => {
   const ev = helpers.evidence();
   const listed = await ${ns}.${list}(${J(p.listArgs ?? {})});
-  const items = (Array.isArray(listed) ? listed : listed[${J(p.itemsField ?? "items")}] || []).slice(0, ${J(p.limit ?? 50)});
+  const items = (Array.isArray(listed) ? listed : (listed && listed[${J(p.itemsField ?? "items")}]) || []).slice(0, ${J(p.limit ?? 50)});
   ev.step("list", { count: items.length });
   const ids = items.map((it) => it[${J(p.idField)}]);
   const results = await helpers.parallel(ids.map((id) => () => ${ns}.${detail}({ [${J(p.detailArg)}]: id })), { concurrency: ${J(p.concurrency ?? 4)} });
@@ -120,10 +120,12 @@ export const guardedBulkUpdate: Recipe<GuardedBulkUpdateParams> = {
     const ns = ident(p.namespace ?? "codemode", "namespace");
     const find = ident(p.findTool, "findTool");
     const update = ident(p.updateTool, "updateTool");
+    if (Object.hasOwn(p.patch, p.idArg)) throw new Error(`patch must not contain the id argument "${p.idArg}"`);
+    if (p.dryRun !== undefined && typeof p.dryRun !== "boolean") throw new Error("dryRun must be a boolean");
     return `async () => {
   const ev = helpers.evidence();
   const found = await ${ns}.${find}(${J(p.findArgs ?? {})});
-  const targets = (Array.isArray(found) ? found : found[${J(p.itemsField ?? "items")}] || []).map((t) => t[${J(p.idField)}]);
+  const targets = (Array.isArray(found) ? found : (found && found[${J(p.itemsField ?? "items")}]) || []).map((t) => t[${J(p.idField)}]);
   ev.step("find", { targets: targets.length });
   const maxWrites = ${J(p.maxWrites ?? 20)};
   if (targets.length > maxWrites) return helpers.result({ targets }, { ok: false, reason: "too many targets (" + targets.length + " > " + maxWrites + ")", evidence: ev.steps });
@@ -131,7 +133,7 @@ export const guardedBulkUpdate: Recipe<GuardedBulkUpdateParams> = {
   const applied = [];
   for (const id of targets) {
     try {
-      await ${ns}.${update}({ [${J(p.idArg)}]: id, ...${J(p.patch)} });
+      await ${ns}.${update}({ ...${J(p.patch)}, [${J(p.idArg)}]: id });
       applied.push(id);
     } catch (e) {
       ev.step("stopped", { id, error: String(e.message || e) });

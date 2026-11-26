@@ -75,7 +75,7 @@ test("audit records allowed, denied and failed calls", async () => {
   const ex = withPolicy(base, { read: ["read_a", "slow"], callTimeoutMs: 50, audit: log.sink });
   await ex.execute("async () => { await codemode.read_a(); try { await codemode.secret(); } catch {} try { await codemode.slow(); } catch {} }", fns);
   assert.deepEqual(log.records.map((r) => [r.tool, r.decision, r.ok ?? null]), [["read_a", "allowed", true], ["secret", "denied", null], ["slow", "allowed", false]]);
-  assert.deepEqual(log.summary(), { calls: 2, denied: 1, errors: 1, resultChars: 3 });
+  assert.deepEqual(log.summary(), { dropped: 0, calls: 2, denied: 1, errors: 1, resultChars: 3 });
 });
 
 test("connector bindings (which would bypass the wrappers) are refused", async () => {

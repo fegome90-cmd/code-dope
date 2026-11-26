@@ -44,8 +44,10 @@ globalThis.helpers = (() => {
       pages++;
       const batch = (page && page[itemsKey]) || [];
       for (const it of batch) items.push(it);
-      cursor = page ? page[nextKey] : null;
-      if (cursor === null || cursor === undefined || cursor === "") return { items, pages, truncated: false };
+      const next = page ? page[nextKey] : null;
+      if (next === null || next === undefined || next === "") return { items, pages, truncated: false };
+      if (next === cursor) return { items, pages, truncated: true, stalled: true }; // server returned the same cursor
+      cursor = next;
     }
     return { items, pages, truncated: true };
   }
@@ -57,10 +59,11 @@ globalThis.helpers = (() => {
     return out;
   }
 
-  /** Retry ONLY idempotent (read) calls. No backoff: sandboxes have no timers. */
+  /** Retry ONLY idempotent (read) calls. No backoff: sandboxes have no timers. Policy denials are never retried. */
   async function retry(fn, opts = {}) {
     const attempts = Math.max(1, opts.attempts ?? 3);
-    const retryIf = opts.retryIf ?? (() => true);
+    const isDenial = (e) => /^Denied /.test(String((e && e.message) || e));
+    const retryIf = opts.retryIf ?? ((e) => !isDenial(e));
     let last;
     for (let i = 0; i < attempts; i++) {
       try {

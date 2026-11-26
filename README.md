@@ -4,7 +4,7 @@ Código listo para que agentes, plugins y servidores MCP ejecuten **Code Mode** 
 
 - **Nivel 1. Hosts con Code Mode nativo** (Cloudflare, Claude PTC): helpers y recipes que se pegan en el código. Ver `src/sandbox/helpers.js` y `snippets/ptc_helpers.py`.
 - **Nivel 2. Plugins y servidores MCP**: `createCodeModeMcpServer`, `createSearchExecuteMcpServer`, `createCodeRunner`, `withPolicy`, recipes.
-- **Nivel 3. Hosts sin Code Mode** (Node): `QuickJSExecutor`, un sandbox WASM que implementa el contrato `Executor` de `@cloudflare/codemode`.
+- **Nivel 3. Hosts sin Code Mode** (Node): `WorkerExecutor` (por defecto: worker thread desechable con QuickJS-WASM dentro) y `QuickJSExecutor` (inline). Ambos implementan el contrato `Executor` de `@cloudflare/codemode`.
 
 Para buscar un patrón según la tarea, ver **[`catalog/patterns.json`](catalog/patterns.json)** (índice para agentes).
 
@@ -65,10 +65,11 @@ async () => {
 ## Garantías de seguridad (y sus límites)
 
 - El código del modelo corre en QuickJS-WASM: sin `require`, `process`, `fetch`, fs, timers ni red. Por el puente solo cruzan strings JSON; ningún objeto del host entra al guest. Verificado en `tests/executor.test.ts` y en la revisión independiente.
-- Límites: timeout de reloj (incluye la espera de herramientas), interrupción de CPU, memoria, stack, logs y tamaño de resultado.
-- La policy envuelve las funciones host **antes** de que el sandbox las vea, así que el código no puede saltarse la allowlist, las aprobaciones, la validación ni el presupuesto. Es fail-closed: una herramienta sin clasificar se deniega, y una escritura sin `approve` también.
+- Por defecto (`isolation: "worker"`) cada ejecución usa un worker thread nuevo, con `env` vacío y límite de heap V8. Un bucle de CPU no bloquea el host, el timeout termina el worker de forma dura y cualquier estado WASM dañado muere con él. `isolation: "inline"` es ~20× más rápido al arrancar, pero un bucle bloquea el event loop hasta el deadline.
+- Límites: timeout de reloj (incluye la espera de herramientas), interrupción de CPU, memoria, stack, logs, llamadas en vuelo y tamaño y profundidad del resultado.
+- La policy envuelve las funciones host **antes** de que el sandbox las vea, así que el código no puede saltarse la allowlist, las aprobaciones, la validación ni el presupuesto. Es fail-closed: una herramienta sin clasificar se deniega, y una escritura sin `approve` también. Los nombres se comparan sanitizados (`delete-user` = `delete_user`). Un nombre sin proveedor aplica a todos los proveedores; usa `proveedor.tool` para acotarlo. Los hooks reciben una copia de los argumentos. Si una llamada vence por timeout, su efecto puede igual completarse (queda auditada como `outcome: "unknown"`), así que las herramientas de escritura deberían ser idempotentes.
 - Las credenciales viven solo en las funciones host.
-- **Límites:** QuickJS-emscripten no está auditado (lo dice su propio autor) y la ejecución es síncrona en el hilo de Node. Para código hostil, ejecuta el servidor además en un proceso o contenedor de bajo privilegio. Detalle en RESEARCH.md §5.
+- **Límites:** QuickJS-emscripten no está auditado (lo dice su propio autor). Un worker thread comparte proceso con el host, así que no es un límite de SO. Para código hostil, ejecuta el servidor además en un proceso o contenedor de bajo privilegio. El texto que devuelven las herramientas puede traer prompt injection: la descripción de la herramienta lo advierte al modelo, pero no se filtra. Detalle en RESEARCH.md §5 y §8.
 
 ## Benchmark (`npm run bench`, datos sintéticos, MCP en memoria)
 
@@ -78,20 +79,20 @@ Workflow: pedidos `pending` de clientes `gold` → ids, totales y suma. Mediana 
 |---|---|---|---|
 | Invocaciones a herramientas | 5 | 5 | medido |
 | Caracteres de resultados que llegan al modelo | 4 402 | 854 | medido |
-| Caracteres de definiciones de herramientas | 928 | 2 400 | medido |
-| Tiempo de herramientas + sandbox (mediana) | ~0,3 ms | ~4 ms | medido |
+| Caracteres de definiciones de herramientas | 928 | 2 479 | medido |
+| Tiempo de herramientas + sandbox (mediana) | ~0,4 ms | ~101 ms (worker) / ~5 ms (inline) | medido |
 | Resultado correcto | sí | sí | medido |
 | Ante un fallo (cliente no disponible) | error al modelo + 1 turno extra | resultado parcial + lista de fallos, en la misma llamada | medido |
 | Turnos del modelo | 6 (secuencial) / 4 (tool use paralelo) | 2 | derivado (script) |
-| Contexto acumulado estimado | ~29 900 chars | ~7 200 chars | estimación |
+| Contexto acumulado estimado (sin contar la salida del modelo) | ~25 500 chars | ~6 500 chars | estimación |
 | Tokens reales y latencia del modelo | — | — | **NOT_VERIFIED** |
 
-Code Mode **no** reduce las llamadas externas: reduce turnos y el volumen que llega al modelo. Además cuesta unos 4 ms de sandbox por ejecución y una descripción de herramienta más larga.
+Code Mode **no** reduce las llamadas externas: reduce turnos y el volumen que llega al modelo. A cambio cuesta ~100 ms por ejecución con aislamiento en worker (~5 ms inline) y una descripción de herramienta más larga. En flujos con modelo real, cada turno ahorrado suele costar mucho más que eso, pero esa latencia es NOT_VERIFIED aquí.
 
 ## Estructura
 
 ```
-src/executor/quickjs-executor.ts   nivel 3: sandbox Node
+src/executor/                      nivel 3: WorkerExecutor (default), QuickJSExecutor (inline)
 src/policy.ts                      allowlist, aprobación, validación, presupuesto, auditoría
 src/runner.ts                      entrada para plugins
 src/mcp.ts                         adaptador MCP (reutiliza codeMcpServer de Cloudflare)

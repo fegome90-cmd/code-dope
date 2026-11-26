@@ -3,9 +3,9 @@
  * consumers that already have tool functions (no MCP needed).
  */
 import type { ExecuteResult, ResolvedProvider } from "@cloudflare/codemode";
-import { QuickJSExecutor, type QuickJSExecutorOptions } from "./executor/quickjs-executor.ts";
+import { createDefaultExecutor, type Isolation } from "./executor/default.ts";
+import type { WorkerExecutorOptions } from "./executor/worker-executor.ts";
 import { createAuditLog, withPolicy, type AuditRecord, type ToolPolicy } from "./policy.ts";
-import { SANDBOX_HELPERS } from "./helpers.ts";
 
 type Fn = (args: unknown) => Promise<unknown> | unknown;
 
@@ -13,7 +13,9 @@ export interface CodeRunnerOptions {
   /** Tool functions by namespace, e.g. { crm: { getCustomer }, mail: { send } }. */
   tools: Record<string, Record<string, Fn>>;
   policy: ToolPolicy;
-  executor?: QuickJSExecutorOptions;
+  executor?: WorkerExecutorOptions;
+  /** Default "worker". */
+  isolation?: Isolation;
 }
 
 export interface CodeRunResult extends ExecuteResult {
@@ -26,7 +28,7 @@ export interface CodeRunner {
 }
 
 export function createCodeRunner(o: CodeRunnerOptions): CodeRunner {
-  const executor = new QuickJSExecutor({ ...o.executor, preludes: [SANDBOX_HELPERS, ...(o.executor?.preludes ?? [])] });
+  const executor = createDefaultExecutor(o.isolation, o.executor);
   const providers: ResolvedProvider[] = Object.entries(o.tools).map(([name, fns]) => ({
     name,
     fns: Object.fromEntries(Object.entries(fns).map(([k, f]) => [k, async (a: unknown) => f(a)])),
