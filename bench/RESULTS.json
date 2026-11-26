@@ -1,0 +1,119 @@
+{
+  "workflow": "pending orders of gold-tier customers -> ids, totals, sum (synthetic data, in-memory MCP)",
+  "date": "2026-11-26T12:43:13.995Z",
+  "node": "v24.22.3",
+  "runs": 20,
+  "poolScenarios": {
+    "warm": {
+      "size": 2,
+      "prewarm": true,
+      "warmupExecutions": 1
+    },
+    "afterError": {
+      "size": 1,
+      "prewarm": true,
+      "recoveryMarginMs": 150,
+      "p50TargetMs": 15,
+      "meetsTarget": true
+    },
+    "cold": {
+      "size": 1,
+      "prewarm": false,
+      "newPoolPerSample": true
+    }
+  },
+  "measured": {
+    "toolInvocations": {
+      "baseline": 5,
+      "candidate": 5
+    },
+    "toolOutputCharsReachingModel": {
+      "baseline": 4402,
+      "candidate": 854
+    },
+    "toolDefinitionChars": {
+      "baseline": 928,
+      "candidate": 2436
+    },
+    "candidateCodeChars_modelOutput": 721,
+    "toolWallClockMsMedian": {
+      "baseline": 0.43,
+      "candidateWorker": 61.53,
+      "candidatePoolWarm": 2.74,
+      "candidatePoolAfterError": 6.07,
+      "candidatePoolCold": 50.92,
+      "candidateInline": 2.44,
+      "p10p90": {
+        "baseline": [
+          0.18,
+          0.75
+        ],
+        "candidateWorker": [
+          59.58,
+          84.47
+        ],
+        "candidatePoolWarm": [
+          2.33,
+          4.06
+        ],
+        "candidatePoolAfterError": [
+          5.48,
+          6.96
+        ],
+        "candidatePoolCold": [
+          49.03,
+          52.4
+        ],
+        "candidateInline": [
+          1.9,
+          4.03
+        ]
+      },
+      "p95": {
+        "baseline": 0.91,
+        "candidateWorker": 87.29,
+        "candidatePoolWarm": 5.88,
+        "candidatePoolAfterError": 7.94,
+        "candidatePoolCold": 53.81,
+        "candidateInline": 4.64
+      }
+    },
+    "correct": {
+      "baseline": true,
+      "candidate": true
+    },
+    "onFailure_customer_c1_unavailable": {
+      "baseline": {
+        "errorsReturnedToModel": 1,
+        "extraTurnsToHandle": 1
+      },
+      "candidate": {
+        "complete": false,
+        "failedCustomers": [
+          {
+            "id": "c-1",
+            "error": "customer c-1 unavailable"
+          }
+        ],
+        "partialOrdersReturned": 10
+      }
+    }
+  },
+  "derived_scripted": {
+    "modelTurns": {
+      "baselineSequential": 6,
+      "baselineParallelToolUse": 4,
+      "candidate": 2
+    },
+    "cumulativeContextCharsEstimate": {
+      "baselineSequential": 25470,
+      "candidate": 6447
+    }
+  },
+  "NOT_VERIFIED": [
+    "real input/output tokens (no tokenizer or model in the loop; chars/4 is only a rough proxy)",
+    "model latency",
+    "whether a model writes the candidate code unaided",
+    "behaviour over real network MCP servers"
+  ]
+}

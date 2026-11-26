@@ -4,3 +4,5 @@
 *.jpeg binary
 *.pdf binary
 *.zip binary
+
+dist/** linguist-generated=true -diff

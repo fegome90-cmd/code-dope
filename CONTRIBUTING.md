@@ -8,13 +8,13 @@
 | `tester` | Validar el candidato integrado | PR desde `developer` |
 | `main` | Conservar la versión estable | PR desde `tester` y autorización del mantenedor |
 
-El PR #1 es el bootstrap previo a este flujo y conserva su destino `main`. Si el mantenedor lo aprueba y fusiona, sincronizar `developer` y `tester` mediante PR antes de usar el flujo normal. No se promociona ningún cambio automáticamente.
+El bootstrap #1 y el arreglo del escáner #4 ya están integrados; las ramas permanentes quedaron sincronizadas tras #5. El PR #2 apunta a `developer`. No se promociona ningún cambio automáticamente.
 
 ## Commits
 
 - Parte del SHA vigente y abre una rama por cambio coherente. No hagas push directo, force-push ni borres ramas protegidas.
 - Un commit debe tener un propósito verificable. Usa `tipo(área): resultado`; explica por qué si no se desprende del cambio.
-- Revisa el diff y ejecuta `bash scripts/check-secrets.sh staged` antes de subir. No subas claves, archivos de entorno, rutas privadas, artefactos de máquina ni evidencia con datos sensibles.
+- Revisa el diff, ejecuta `npm ci && npm run test:all` y `bash scripts/check-secrets.sh staged` antes de subir. El lockfile es `package-lock.json`; no ejecutar el flujo de bootstrap retirado. No subas claves, archivos de entorno, rutas privadas, artefactos de máquina ni evidencia con datos sensibles.
 
 ## Pull request y merge
 

@@ -1,7 +1,6 @@
 # Node and generated packages
 node_modules/
 .pnpm-store/
-dist/
 coverage/
 *.tgz
 *.tsbuildinfo

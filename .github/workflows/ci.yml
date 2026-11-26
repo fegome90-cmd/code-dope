@@ -1,4 +1,4 @@
-name: Bootstrap
+name: Library verification
 on:
   pull_request:
     branches: [developer, tester, main]
@@ -16,10 +16,25 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
-      - uses: pnpm/action-setup@v4
-      - run: pnpm install --frozen-lockfile --ignore-scripts
-      - run: pnpm typecheck
-      - run: pnpm test
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: npm install --global npm@11.19.1 --ignore-scripts
+      - run: npm ci
+      - run: npm run test:all
+  package-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - run: npm install --global npm@11.19.1 --ignore-scripts
+      - run: npm ci
+      - run: npm run check:dist
+      - run: npm run test:pkg
   secrets:
     name: Secrets and private paths
     runs-on: ubuntu-latest
