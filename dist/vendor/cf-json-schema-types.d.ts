@@ -4,7 +4,17 @@ export interface ConversionContext {
     depth: number;
     seen: Set<unknown>;
     maxDepth: number;
+    budget?: Budget;
+    work?: Budget;
+    output?: Budget;
+    memo?: Map<object, Map<string, string>>;
+    unsafe?: {
+        count: number;
+    };
 }
+type Budget = {
+    remaining: number;
+};
 /**
  * Convert a JSON Schema to a TypeScript type string.
  * This is a direct conversion without going through Zod.
@@ -32,3 +42,4 @@ export type JsonSchemaToolDescriptors = Record<string, JsonSchemaToolDescriptor>
  * definitions, etc.) and don't need the AI SDK.
  */
 export declare function generateTypesFromJsonSchema(tools: JsonSchemaToolDescriptors): string;
+export {};

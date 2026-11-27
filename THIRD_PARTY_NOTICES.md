@@ -4,7 +4,12 @@
 
 `src/vendor/cf-normalize.ts`, `src/vendor/cf-json-schema-types.ts` and `src/vendor/cf-utils.ts` are copied from
 https://github.com/cloudflare/agents (`packages/codemode/src/normalize.ts`, `json-schema-types.ts`, `utils.ts`),
-commit `841b6fc92816d3369dbef7ed3f39168519409248`. The only changes are the header comments and the import paths.
+commit `841b6fc92816d3369dbef7ed3f39168519409248`. In addition to headers and import paths, local changes are:
+
+- `cf-normalize.ts`: linear fence stripping and slicing standalone arrows to the expression range.
+- `cf-json-schema-types.ts`: bounded schema conversion, depth-aware memoization, own-property reference resolution,
+  and defensive handling of malformed schema metadata and boolean schemas.
+
 `src/mcp-resources.ts#unwrapMcpResult`, shared by both adapters, follows the same priority order as
 `unwrapMcpResult` in `packages/codemode/src/mcp.ts` (rewritten). The `code` tool is registered directly.
 

@@ -1,5 +1,5 @@
 // Vendored from cloudflare/agents packages/codemode/src/json-schema-types.ts @ 841b6fc (MIT, (c) 2025 Cloudflare, Inc.).
-// Changes: import paths only. See THIRD_PARTY_NOTICES.md.
+// Local changes: import paths, bounded rendering and memoization, and schema guards. See THIRD_PARTY_NOTICES.md.
 import type { JSONSchema7, JSONSchema7Definition } from "json-schema";
 import {
   sanitizeToolName,
@@ -14,6 +14,24 @@ export interface ConversionContext {
   depth: number;
   seen: Set<unknown>;
   maxDepth: number;
+  budget?: Budget;
+  work?: Budget;
+  output?: Budget;
+  memo?: Map<object, Map<string, string>>;
+  unsafe?: { count: number };
+}
+
+type Budget = { remaining: number };
+type ActiveContext = Required<ConversionContext>;
+
+const maxNodes = 5_000;
+const maxWork = 50_000;
+const maxOutput = 1_000_000;
+const conversionLimit = Symbol("schema conversion limit");
+
+function spend(budget: Budget, amount: number): void {
+  budget.remaining -= amount;
+  if (budget.remaining < 0) throw conversionLimit;
 }
 
 /**
@@ -36,14 +54,14 @@ function resolveRef(
 
   let current: unknown = root;
   for (const seg of segments) {
-    if (current === null || typeof current !== "object") return null;
+    if (current === null || typeof current !== "object" || Array.isArray(current) || !Object.hasOwn(current, seg)) return null;
     current = (current as Record<string, unknown>)[seg];
     if (current === undefined) return null;
   }
 
   // Allow both object schemas and boolean schemas (true = any, false = never)
   if (typeof current === "boolean") return current;
-  if (current === null || typeof current !== "object") return null;
+  if (current === null || typeof current !== "object" || Array.isArray(current)) return null;
   return current as JSONSchema7;
 }
 
@@ -94,30 +112,28 @@ function hasTopLevelUnion(type: string): boolean {
 function arrayTypeString(
   schema: JSONSchema7,
   indent: string,
-  ctx: ConversionContext
+  ctx: ActiveContext
 ): string {
   // Tuple support: prefixItems (JSON Schema 2020-12)
   const prefixItems = (schema as Record<string, unknown>)
     .prefixItems as JSONSchema7Definition[];
   if (Array.isArray(prefixItems)) {
-    const types = prefixItems.map((s) =>
-      jsonSchemaToTypeString(s, indent, ctx)
-    );
+    spend(ctx.work, prefixItems.length);
+    const types = prefixItems.map((s) => renderSchema(s, indent, ctx));
     return `[${types.join(", ")}]`;
   }
 
   // Tuple support: items as array (draft-07)
   if (Array.isArray(schema.items)) {
-    const types = schema.items.map((s) =>
-      jsonSchemaToTypeString(s, indent, ctx)
-    );
+    spend(ctx.work, schema.items.length);
+    const types = schema.items.map((s) => renderSchema(s, indent, ctx));
     return `[${types.join(", ")}]`;
   }
 
-  if (schema.items) {
+  if (schema.items || schema.items === false) {
     // Array<T>, not T[]: `[]` binds tighter than `|` and `&`, so a union or
     // intersection item type would otherwise leak out of the array.
-    return `Array<${jsonSchemaToTypeString(schema.items, indent, ctx)}>`;
+    return `Array<${renderSchema(schema.items, indent, ctx)}>`;
   }
   return "unknown[]";
 }
@@ -128,32 +144,32 @@ function arrayTypeString(
 function objectTypeString(
   schema: JSONSchema7,
   indent: string,
-  nextCtx: ConversionContext
+  nextCtx: ActiveContext
 ): string {
   const props = schema.properties || {};
-  const required = new Set(schema.required || []);
+  const requiredNames = Array.isArray(schema.required) ? schema.required : [];
+  spend(nextCtx.work, requiredNames.length);
+  const required = new Set(requiredNames);
   const lines: string[] = [];
 
-  for (const [propName, propSchema] of Object.entries(props)) {
-    if (typeof propSchema === "boolean") {
-      const boolType = propSchema ? "unknown" : "never";
-      const optionalMark = required.has(propName) ? "" : "?";
-      lines.push(
-        `${indent}    ${quoteProp(propName)}${optionalMark}: ${boolType};`
-      );
-      continue;
-    }
+  for (const propName in props) {
+    spend(nextCtx.work, 1);
+    if (!Object.hasOwn(props, propName)) continue;
+    spend(nextCtx.output, propName.length);
+    const propSchema = props[propName];
 
     const isRequired = required.has(propName);
-    const propType = jsonSchemaToTypeString(
+    const propType = renderSchema(
       propSchema,
       indent + "    ",
       nextCtx
     );
-    const desc = propSchema.description;
-    const format = propSchema.format;
+    const property = propSchema && typeof propSchema === "object" ? propSchema : undefined;
+    const desc = typeof property?.description === "string" ? property.description : "";
+    const format = typeof property?.format === "string" ? property.format : "";
 
     if (desc || format) {
+      spend(nextCtx.output, desc.length + format.length);
       const descText = desc
         ? escapeJsDoc(desc.replace(/\r?\n/g, " "))
         : undefined;
@@ -179,7 +195,7 @@ function objectTypeString(
     const valueType =
       schema.additionalProperties === true
         ? "unknown"
-        : jsonSchemaToTypeString(
+        : renderSchema(
             schema.additionalProperties,
             indent + "    ",
             nextCtx
@@ -205,7 +221,7 @@ function singleTypeString(
   type: string | undefined,
   schema: JSONSchema7,
   indent: string,
-  ctx: ConversionContext
+  ctx: ActiveContext
 ): string {
   if (type === "string") return "string";
   if (type === "number" || type === "integer") return "number";
@@ -227,110 +243,130 @@ export function jsonSchemaToTypeString(
   indent: string,
   ctx: ConversionContext
 ): string {
-  // Handle boolean schemas
-  if (typeof schema === "boolean") {
-    return schema ? "unknown" : "never";
+  const active: ActiveContext = {
+    ...ctx,
+    budget: ctx.budget ?? { remaining: maxNodes },
+    work: ctx.work ?? { remaining: maxWork },
+    output: ctx.output ?? { remaining: maxOutput },
+    memo: ctx.memo ?? new Map(),
+    unsafe: ctx.unsafe ?? { count: 0 }
+  };
+  try {
+    return renderSchema(schema, indent, active);
+  } catch (error) {
+    if (error !== conversionLimit) throw error;
+    return "unknown";
+  }
+}
+
+function accountOutput(text: string, ctx: ActiveContext): string {
+  spend(ctx.output, text.length);
+  return text;
+}
+
+function renderSchema(schema: JSONSchema7Definition, indent: string, ctx: ActiveContext): string {
+  // Boolean schemas are types, not object visits.
+  if (typeof schema === "boolean") return accountOutput(schema ? "unknown" : "never", ctx);
+  if (schema === null || typeof schema !== "object" || Array.isArray(schema)) {
+    return accountOutput("unknown", ctx);
+  }
+  spend(ctx.work, 1);
+
+  if (ctx.depth >= ctx.maxDepth || ctx.seen.has(schema)) {
+    ctx.unsafe.count++;
+    return accountOutput("unknown", ctx);
+  }
+  // The available depth is path-dependent; siblings at the same depth can share
+  // complete results. Every occurrence still spends text budget, even on a hit.
+  const key = `${ctx.depth}:${indent}`;
+  const cached = ctx.memo.get(schema)?.get(key);
+  if (cached !== undefined) return accountOutput(cached, ctx);
+  if (--ctx.budget.remaining < 0) {
+    ctx.unsafe.count++;
+    return accountOutput("unknown", ctx);
   }
 
-  // Depth guard
-  if (ctx.depth >= ctx.maxDepth) return "unknown";
-
-  // Circular reference guard
-  if (ctx.seen.has(schema)) return "unknown";
-
+  const unsafeBefore = ctx.unsafe.count;
   ctx.seen.add(schema);
-  const nextCtx: ConversionContext = {
-    ...ctx,
-    depth: ctx.depth + 1
-  };
-
   try {
-    // Handle $ref
-    if (schema.$ref) {
-      const resolved = resolveRef(schema.$ref, ctx.root);
-      if (!resolved) return "unknown";
-      return applyNullable(
-        jsonSchemaToTypeString(resolved, indent, nextCtx),
-        schema
-      );
+    const out = accountOutput(renderType(schema, indent, { ...ctx, depth: ctx.depth + 1 }), ctx);
+    if (ctx.unsafe.count === unsafeBefore) {
+      const entries = ctx.memo.get(schema) ?? new Map<string, string>();
+      entries.set(key, out);
+      ctx.memo.set(schema, entries);
     }
-
-    // Handle anyOf/oneOf (union types)
-    if (schema.anyOf) {
-      const types = schema.anyOf.map((s) =>
-        jsonSchemaToTypeString(s, indent, nextCtx)
-      );
-      if (types.length === 0) return "never";
-      return applyNullable(types.join(" | "), schema);
-    }
-    if (schema.oneOf) {
-      const types = schema.oneOf.map((s) =>
-        jsonSchemaToTypeString(s, indent, nextCtx)
-      );
-      if (types.length === 0) return "never";
-      return applyNullable(types.join(" | "), schema);
-    }
-
-    // Handle allOf (intersection types)
-    if (schema.allOf) {
-      // `&` binds tighter than `|`, so a union member needs parentheses.
-      const types = schema.allOf.map((s) => {
-        const member = jsonSchemaToTypeString(s, indent, nextCtx);
-        return hasTopLevelUnion(member) ? `(${member})` : member;
-      });
-      if (types.length === 0) return "unknown";
-      return applyNullable(types.join(" & "), schema);
-    }
-
-    // Handle enum
-    if (schema.enum) {
-      if (schema.enum.length === 0) return "never";
-      const result = schema.enum
-        .map((v) => {
-          if (v === null) return "null";
-          if (typeof v === "string") return '"' + escapeStringLiteral(v) + '"';
-          if (typeof v === "object") return JSON.stringify(v) ?? "unknown";
-          return String(v);
-        })
-        .join(" | ");
-      return applyNullable(result, schema);
-    }
-
-    // Handle const
-    if (schema.const !== undefined) {
-      const result =
-        schema.const === null
-          ? "null"
-          : typeof schema.const === "string"
-            ? '"' + escapeStringLiteral(schema.const) + '"'
-            : typeof schema.const === "object"
-              ? (JSON.stringify(schema.const) ?? "unknown")
-              : String(schema.const);
-      return applyNullable(result, schema);
-    }
-
-    // Handle type
-    const type = schema.type;
-
-    // Array of types (e.g., ["string", "null"]). Each member reads the
-    // schema's own keywords, so ["array", "null"] keeps `items` and
-    // ["object", "null"] keeps `properties`.
-    if (Array.isArray(type)) {
-      const types = new Set(
-        type.map((t) => singleTypeString(t, schema, indent, nextCtx))
-      );
-      if (types.size === 0 || types.has("unknown")) return "unknown";
-      return applyNullable([...types].join(" | "), schema);
-    }
-
-    if (type === "null") return "null";
-    return applyNullable(
-      singleTypeString(type, schema, indent, nextCtx),
-      schema
-    );
+    return out;
   } finally {
     ctx.seen.delete(schema);
   }
+}
+
+function literalType(value: unknown, ctx: ActiveContext): string {
+  if (value === null) return "null";
+  if (typeof value === "string") {
+    spend(ctx.output, value.length);
+    return '"' + escapeStringLiteral(value) + '"';
+  }
+  if (typeof value === "object") {
+    return JSON.stringify(value, (key, child: unknown) => {
+      spend(ctx.work, 1);
+      spend(ctx.output, key.length + (typeof child === "string" ? child.length : 0));
+      return child;
+    }) ?? "unknown";
+  }
+  return String(value);
+}
+
+function renderType(schema: JSONSchema7, indent: string, nextCtx: ActiveContext): string {
+  if (typeof schema.$ref === "string" && schema.$ref) {
+    spend(nextCtx.work, schema.$ref.length);
+    const resolved = resolveRef(schema.$ref, nextCtx.root);
+    if (resolved === null) return "unknown";
+    return applyNullable(renderSchema(resolved, indent, nextCtx), schema);
+  }
+
+  // Union keywords take precedence in the same order as upstream.
+  const variants = Array.isArray(schema.anyOf) ? schema.anyOf : schema.oneOf;
+  if (Array.isArray(variants)) {
+    spend(nextCtx.work, variants.length);
+    if (variants.length === 0) return "never";
+    const types = variants.map((s) => renderSchema(s, indent, nextCtx));
+    return applyNullable(types.join(" | "), schema);
+  }
+
+  if (Array.isArray(schema.allOf)) {
+    spend(nextCtx.work, schema.allOf.length);
+    if (schema.allOf.length === 0) return "unknown";
+    // `&` binds tighter than `|`, so a union member needs parentheses.
+    const types = schema.allOf.map((s) => {
+      const member = renderSchema(s, indent, nextCtx);
+      return hasTopLevelUnion(member) ? `(${member})` : member;
+    });
+    return applyNullable(types.join(" & "), schema);
+  }
+
+  if (Array.isArray(schema.enum)) {
+    spend(nextCtx.work, schema.enum.length);
+    if (schema.enum.length === 0) return "never";
+    const types = schema.enum.map((v) => accountOutput(literalType(v, nextCtx), nextCtx));
+    return applyNullable(types.join(" | "), schema);
+  }
+  if (schema.const !== undefined) return applyNullable(literalType(schema.const, nextCtx), schema);
+
+  const type = schema.type;
+
+  // Each member of a type array reads the schema's own keywords.
+  if (Array.isArray(type)) {
+    spend(nextCtx.work, type.length);
+    const types = new Set(
+      type.map((t) => accountOutput(singleTypeString(t, schema, indent, nextCtx), nextCtx))
+    );
+    if (types.size === 0 || types.has("unknown")) return "unknown";
+    return applyNullable([...types].join(" | "), schema);
+  }
+
+  if (type === "null") return "null";
+  return applyNullable(singleTypeString(type, schema, indent, nextCtx), schema);
 }
 
 /**
@@ -356,16 +392,17 @@ export function jsonSchemaToType(
 function extractJsonSchemaDescriptions(
   schema: JSONSchema7
 ): Record<string, string> {
-  const descriptions: Record<string, string> = {};
-  if (schema.properties) {
-    for (const [fieldName, propSchema] of Object.entries(schema.properties)) {
-      if (
-        propSchema &&
-        typeof propSchema === "object" &&
-        propSchema.description
-      ) {
-        descriptions[fieldName] = propSchema.description;
-      }
+  const descriptions: Record<string, string> = Object.create(null);
+  const work = { remaining: maxWork };
+  const output = { remaining: maxOutput };
+  if (!schema.properties) return descriptions;
+  for (const fieldName in schema.properties) {
+    spend(work, 1);
+    if (!Object.hasOwn(schema.properties, fieldName)) continue;
+    const propSchema = schema.properties[fieldName];
+    if (propSchema && typeof propSchema === "object" && typeof propSchema.description === "string" && propSchema.description) {
+      spend(output, fieldName.length + propSchema.description.length);
+      descriptions[fieldName] = propSchema.description;
     }
   }
   return descriptions;

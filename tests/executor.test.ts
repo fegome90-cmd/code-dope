@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { QuickJSExecutor, SANDBOX_HELPERS } from "../src/index.ts";
+import { normalizeCode } from "../src/vendor/cf-normalize.ts";
 
 const ex = new QuickJSExecutor({ timeoutMs: 1500 });
 const fns = {
@@ -26,6 +27,23 @@ test("runs async arrow functions and composes tool calls (sequential + parallel)
 test("normalizes bare statements and fenced code (vendored Cloudflare normalizeCode)", async () => {
   assert.equal((await ex.execute("const r = await codemode.add({x:2,y:2}); return r * 10;", fns)).result, 40);
   assert.equal((await ex.execute("```js\nasync () => 7\n```", fns)).result, 7);
+});
+
+test("normalizes a standalone arrow with a trailing semicolon before execution", async () => {
+  const code = "async () => 1;";
+  assert.equal(normalizeCode(code), "async () => 1");
+  const result = await ex.execute(code, {});
+  assert.equal(result.error, undefined);
+  assert.equal(result.result, 1);
+});
+
+test("strips complete LF or CRLF fences only when the closer is on its own line", () => {
+  for (const newline of ["\n", "\r\n"]) {
+    assert.equal(normalizeCode(["```js", "async () => 1", "  ```"].join(newline)), "async () => 1");
+  }
+  for (const raw of ["```js\nasync () => 1", "```js\nasync () => 1```", "```js\nasync () => 1\n``` note"]) {
+    assert.ok(normalizeCode(raw).includes(raw), "an invalid fence must leave the original source intact");
+  }
 });
 
 test("undefined result and JSON round-trip", async () => {

@@ -32,7 +32,12 @@ export function typesFor(tools, ambiguous = collisions(tools.map((t) => t.name))
         const declarations = [];
         const methods = tools.map((t, i) => {
             const input = `Tool${i}Input`;
-            declarations.push(jsonSchemaToType((t.inputSchema ?? { type: "object" }), input));
+            try {
+                declarations.push(jsonSchemaToType((t.inputSchema ?? { type: "object" }), input));
+            }
+            catch {
+                declarations.push(`type ${input} = unknown`);
+            }
             const name = ambiguous.has(t.name) ? t.name : sanitizeToolName(t.name);
             const doc = t.description ? `\n\t/** ${escapeJsDoc(t.description.replace(/\r?\n/g, " "))} */` : "";
             return `${doc}\n\t${JSON.stringify(name)}: (input: ${input}) => Promise<unknown>;`;

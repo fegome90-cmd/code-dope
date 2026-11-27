@@ -1,14 +1,31 @@
 // Vendored from cloudflare/agents packages/codemode/src/normalize.ts @ 841b6fc (MIT, (c) 2025 Cloudflare, Inc.).
-// Unmodified except this header. See THIRD_PARTY_NOTICES.md.
+// Local changes: linear fence stripping and arrow-expression slicing. See THIRD_PARTY_NOTICES.md.
 import * as acorn from "acorn";
+const fenceTags = new Set(["", "js", "javascript", "typescript", "ts", "tsx", "jsx"]);
 /**
  * Strip markdown code fences that LLMs commonly wrap code in.
  * Handles ```js, ```javascript, ```typescript, ```ts, or bare ```.
  */
-function stripCodeFences(code) {
-    const fenced = /^```(?:js|javascript|typescript|ts|tsx|jsx)?\s*\n([\s\S]*?)```\s*$/;
-    const match = code.match(fenced);
-    return match ? match[1] : code;
+function stripCodeFences(raw) {
+    const trimmed = raw.trimEnd();
+    if (!trimmed.startsWith("```"))
+        return raw;
+    const nl = trimmed.indexOf("\n");
+    if (nl === -1 || !fenceTags.has(trimmed.slice(3, nl).trim()))
+        return raw;
+    const closeIdx = trimmed.length - 3;
+    if (closeIdx <= nl || !trimmed.endsWith("```"))
+        return raw;
+    let closeLine = closeIdx;
+    while (trimmed[closeLine - 1] === " " || trimmed[closeLine - 1] === "\t") {
+        closeLine--;
+    }
+    if (trimmed[closeLine - 1] !== "\n")
+        return raw;
+    let bodyEnd = closeLine - 1;
+    if (trimmed[bodyEnd - 1] === "\r")
+        bodyEnd--;
+    return trimmed.slice(nl + 1, bodyEnd);
 }
 export function normalizeCode(code) {
     const trimmed = stripCodeFences(code.trim());
@@ -20,11 +37,11 @@ export function normalizeCode(code) {
             ecmaVersion: "latest",
             sourceType: "module"
         });
-        // Already an arrow function — pass through
+        // Keep the arrow expression, not statement punctuation around it.
         if (ast.body.length === 1 && ast.body[0].type === "ExpressionStatement") {
             const expr = ast.body[0].expression;
             if (expr.type === "ArrowFunctionExpression")
-                return source;
+                return source.slice(expr.start, expr.end);
         }
         // export default <expression> → unwrap to just the expression
         if (ast.body.length === 1 &&
