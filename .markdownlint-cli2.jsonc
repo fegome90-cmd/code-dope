@@ -1,0 +1,34 @@
+{
+  "gitignore": true,
+  "globs": ["**/*.md"],
+  "config": {
+    "default": true,
+    "MD001": false,
+    "MD003": { "style": "atx" },
+    "MD004": false,
+    "MD007": { "indent": 2 },
+    "MD013": false,
+    "MD022": false,
+    "MD024": { "siblings_only": true },
+    "MD025": false,
+    "MD031": false,
+    "MD032": false,
+    "MD033": false,
+    "MD036": false,
+    "MD040": false,
+    "MD041": false,
+    "MD034": false,
+    "MD045": false,
+    "MD056": false,
+    "MD058": false,
+    "MD060": false
+  },
+  "ignores": [
+    "**/node_modules/**",
+    ".venv/**",
+    "dist/**",
+    "**/archive/**",
+    "**/.worktrees/**",
+    "**/worktrees/**"
+  ]
+}

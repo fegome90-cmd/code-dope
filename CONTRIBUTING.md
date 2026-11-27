@@ -16,10 +16,19 @@ El bootstrap #1 y el arreglo del escáner #4 ya están integrados; las ramas per
 - Un commit debe tener un propósito verificable. Usa `tipo(área): resultado`; explica por qué si no se desprende del cambio.
 - Revisa el diff, ejecuta `npm ci && npm run test:all` y `bash scripts/check-secrets.sh staged` antes de subir. El lockfile es `package-lock.json`; no ejecutar el flujo de bootstrap retirado. No subas claves, archivos de entorno, rutas privadas, artefactos de máquina ni evidencia con datos sensibles.
 
+## Hooks de pre-commit
+
+Necesitas `uv` 0.13.9 y `gitleaks` en el PATH, además de Node 24 y npm 11.19.1. La distribución no incluye el script `prepare` (lo verifica `tests/package.test.ts`), así que instala el hook una vez por checkout con `npm exec husky`; en worktrees ejecuta además `git config extensions.worktreeConfig true` y `git config --worktree core.hooksPath .husky/_` para no compartir la configuración con `main`. En cada `git commit` se ejecuta:
+
+1. `npm exec lint-staged`: Biome sobre código/JSON staged, `npm run typecheck` sobre el estado staged (no sobre el disco), markdownlint sobre Markdown staged y codespell con la whitelist de `config/codespell-ignore.txt`.
+2. `bash scripts/check-secrets.sh staged`: el mismo escaneo de secretos que exige esta guía.
+
+El typecheck vive dentro de lint-staged a propósito: corre mientras los cambios no staged están ocultos, así un archivo corregido en disco pero no stageado no puede disimular un error de tipos en el commit. El hook no ejecuta `npm run test:all` (es lento y CI ya lo corre) y NO sustituye a CI ni autoriza merge. Si el hook no está instalado, ejecuta esos dos comandos manualmente antes de subir. `git commit --no-verify` es una excepción explícita: no exime del escaneo de secretos ni de los checks de CI.
+
 ## Pull request y merge
 
 - Abre el PR como borrador mientras falten pruebas o revisión. Completa [la plantilla](.github/PULL_REQUEST_TEMPLATE.md) con alcance, límites, procedencia y evidencia del SHA evaluado.
-- El [ruleset de GitHub](https://github.com/fegome90-cmd/code-dope/rules/28158227) exige PR, conversaciones resueltas, base actualizada y checks `package`, `Secrets and private paths` y `Documentation links and references` de GitHub Actions. Bloquea force-push y eliminación en las tres ramas, sin bypass.
+- El [ruleset de GitHub](https://github.com/fegome90-cmd/code-dope/rules/28158227) exige PR, conversaciones resueltas, base actualizada y checks `package`, `Secrets and private paths` y `Documentation links and references` de GitHub Actions. Bloquea force-push y eliminación en las tres ramas, sin bypass. El job `Config linters` es informativo: no está en la lista de checks exigidos por el ruleset y no lo agregamos sin autorización.
 - El mantenedor autoriza explícitamente cada merge. Para ramas de trabajo preferimos squash; para promociones entre ramas permanentes, un merge commit conserva la ascendencia compartida. No activar auto-merge. CI verde no autoriza publicación, despliegue ni cambios de permisos.
 - Comprueba la rama de origen y destino antes de promocionar. La tabla es una regla de trabajo; el ruleset valida PR y checks, no restringe automáticamente la rama de origen.
 

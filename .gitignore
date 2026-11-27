@@ -23,3 +23,9 @@ __pycache__/
 .DS_Store
 .idea/
 .vscode/
+
+# Tooling local y worktrees (los linters no deben recorrerlos)
+.atl/
+.husky/_
+.worktrees/
+worktrees/
