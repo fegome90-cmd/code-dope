@@ -24,3 +24,9 @@ __pycache__/
 .DS_Store
 .idea/
 .vscode/
+# Local AI runtime state
+.atl/
+
+# Local worktree roots (linters must not traverse them)
+.worktrees/
+worktrees/

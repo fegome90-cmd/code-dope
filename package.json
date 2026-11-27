@@ -23,10 +23,14 @@
     "format": "biome format --write .",
     "lint:code": "biome check .",
     "lint:md": "markdownlint-cli2",
-    "lint": "pnpm run lint:code && pnpm run lint:md"
+    "lint:spell": "uv run --frozen codespell",
+    "lint": "pnpm run lint:code && pnpm run lint:md",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.8",
+    "husky": "9.1.7",
+    "lint-staged": "17.6.2",
     "markdownlint-cli2": "0.24.1",
     "typescript": "5.9.3"
   }

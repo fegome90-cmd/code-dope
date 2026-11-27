@@ -1,3 +1,5 @@
 [codespell]
-skip = .git,.venv,node_modules,dist,archive,__pycache__,*.lock,pnpm-lock.yaml,*.svg,tools/agent-docs-kit
-ignore-words-list = argumentos,comando,constitucion,controles,falso,fase,hagas,historial,posible,requiere
+# Dependencias, lockfiles y la propia whitelist.
+skip = .git,.venv,node_modules,dist,archive,__pycache__,*.lock,pnpm-lock.yaml,*/pnpm-lock.yaml,*.svg,config/codespell-ignore.txt,*/config/codespell-ignore.txt
+# Única fuente de palabras españolas permitidas (una por línea).
+ignore-words = config/codespell-ignore.txt

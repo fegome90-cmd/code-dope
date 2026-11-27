@@ -8,6 +8,8 @@
   "files": {
     "includes": [
       "**",
+      "!**/.worktrees",
+      "!**/worktrees",
       "!**/dist",
       "!**/coverage",
       "!**/node_modules",
@@ -17,7 +19,6 @@
       "!**/.ruff_cache",
       "!**/.mypy_cache",
       "!**/.pytest_cache",
-      "!**/tools/agent-docs-kit",
       "!**/*.md"
     ]
   },

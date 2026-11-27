@@ -22,7 +22,7 @@ required-version = "==0.13.9"
 target-version = "py312"
 line-length = 100
 force-exclude = true
-extend-exclude = ["dist", "node_modules", ".venv", "tools/agent-docs-kit"]
+extend-exclude = ["dist", "node_modules", ".venv"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM"]

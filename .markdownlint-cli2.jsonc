@@ -1,4 +1,5 @@
 {
+  "gitignore": true,
   "globs": ["**/*.md"],
   "config": {
     "default": true,
@@ -17,11 +18,11 @@
     "MD058": false
   },
   "ignores": [
-    "node_modules/**",
+    "**/node_modules/**",
     ".venv/**",
     "dist/**",
-    "archive/**",
     "**/archive/**",
-    "tools/agent-docs-kit/**"
+    "**/.worktrees/**",
+    "**/worktrees/**"
   ]
 }
