@@ -1,8 +1,8 @@
 // Candidate: pure request/selection boundary. Not an authorization token.
+import { Validator } from '@cfworker/json-schema';
 export const ROUTES = Object.freeze(['direct', 'native', 'worker', 'inline', 'pool']);
 const MODES = ['off', 'on', 'auto'];
 const TELEMETRY = ['minimal', 'extended'];
-const REQUEST_KEYS = ['schemaVersion', 'route', 'telemetry'];
 const fail = code => { throw new Error(code); };
 export const requestSchema = {
   $schema: 'http://json-schema.org/draft-07/schema#',
@@ -14,17 +14,14 @@ export const requestSchema = {
     telemetry: { enum: [...TELEMETRY] }
   }
 };
+const requestValidator = new Validator(requestSchema, '7');
 
 // Only serialized input crosses this boundary; no accessors, functions or proxies.
 export function parseRequest(text) {
   if (typeof text !== 'string' || text.length > 1024 || new TextEncoder().encode(text).byteLength > 1024) fail('INVALID_CONFIG');
   let x;
   try { x = JSON.parse(text); } catch { fail('INVALID_CONFIG'); }
-  if (!x || typeof x !== 'object' || Array.isArray(x) ||
-      Object.keys(x).some(k => !REQUEST_KEYS.includes(k)) ||
-      !Object.hasOwn(x, 'schemaVersion') || x.schemaVersion !== 1 ||
-      !Object.hasOwn(x, 'route') || !ROUTES.includes(x.route) ||
-      (Object.hasOwn(x, 'telemetry') && !TELEMETRY.includes(x.telemetry))) fail('INVALID_CONFIG');
+  if (!requestValidator.validate(x).valid) fail('INVALID_CONFIG');
   return Object.freeze({ schemaVersion: 1, route: x.route,
     telemetry: Object.hasOwn(x, 'telemetry') ? x.telemetry : 'minimal' });
 }

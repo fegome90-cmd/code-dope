@@ -1,0 +1,5 @@
+{
+  "mode": "on",
+  "request": { "schemaVersion": 1, "route": "worker" },
+  "operation": { "kind": "program", "code": "async () => await math.sum({values:[5,-2,10]})" }
+}
