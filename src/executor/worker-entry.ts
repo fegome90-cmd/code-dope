@@ -6,7 +6,7 @@
  *    by message, one at a time. Every job gets a fresh QuickJS runtime/context.
  */
 import { parentPort, workerData } from "node:worker_threads";
-import type { ExecuteResult } from "@cloudflare/codemode";
+import type { ExecuteResult } from "../types.ts";
 import { QuickJSExecutor, type QuickJSExecutorOptions } from "./quickjs-executor.ts";
 import type { ProviderSpec, ReplyMsg } from "./worker-bridge.ts";
 

@@ -50,10 +50,16 @@ export function policyAllows(p, provider, tool, ambiguous) {
 function runValidator(v, args) {
     if (typeof v === "function") {
         const r = v(args);
-        return r === true || r === undefined ? undefined : r;
+        if (r === true || r === undefined)
+            return undefined;
+        if (typeof r === "string")
+            return r.length > 0 ? r : "invalid arguments";
+        return "invalid arguments";
     }
     const r = v.safeParse(args);
-    return r.success ? undefined : (r.error?.message ?? "invalid arguments");
+    if (r.success)
+        return undefined;
+    return r.error?.message ? r.error.message : "invalid arguments";
 }
 function size(v) {
     try {
@@ -141,7 +147,7 @@ export function guardFns(provider, fns, policy, state = { calls: 0, seq: 0, clos
                 catch (e) {
                     problem = `validator threw: ${e instanceof Error ? e.message : String(e)}`;
                 }
-                if (problem) {
+                if (problem !== undefined) {
                     release();
                     deny(`invalid arguments: ${problem}`);
                 }

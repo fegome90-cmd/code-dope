@@ -106,3 +106,103 @@ test("executions are isolated from each other", async () => {
   await ex.execute("async () => { globalThis.leak = 42; }", fns);
   assert.equal((await ex.execute("async () => typeof leak", fns)).result, "undefined");
 });
+
+test("rejects reserved, prototype-mutating, and built-in global provider names (Layer 1)", async () => {
+  const blocked = ["JSON", "Object", "Proxy", "Error", "Promise", "__proto__", "constructor", "__r", "arguments"];
+  for (const name of blocked) {
+    const r = await ex.execute("async () => 1", [{ name, fns }]);
+    assert.equal(r.error, `Invalid provider name: ${name}`);
+  }
+});
+
+test("rejects unreserved QuickJS globalThis properties dynamically (Layer 2)", async () => {
+  const r = await ex.execute("async () => 1", [{ name: "escape", fns }]);
+  assert.equal(r.error, "Invalid provider name: escape");
+});
+
+test("guest global mutations do not break bridge calls, logs, or return serialization (Layer 3)", async () => {
+  const r = await ex.execute(
+    `async () => {
+      globalThis.JSON = { stringify: () => '{"hijacked":true}', parse: () => ({}) };
+      globalThis.Error = function () {};
+      Array.prototype.map = () => [];
+      console.log("hi", { x: 1 });
+      const sum = await codemode.add({ x: 2, y: 3 });
+      let caught = "";
+      try {
+        await codemode.fail();
+      } catch (e) {
+        caught = e.message;
+      }
+      return { sum, caught };
+    }`,
+    fns,
+  );
+  assert.equal(r.error, undefined);
+  assert.deepEqual(r.result, { sum: 5, caught: "upstream exploded" });
+  assert.deepEqual(r.logs, ['hi {"x":1}']);
+});
+
+test("settle() OOM recovery delivers catchable fallback error to guest", async () => {
+  const small = new QuickJSExecutor({ timeoutMs: 5_000, memoryLimitBytes: 4 * 1024 * 1024 });
+  const r = await small.execute(
+    `async () => {
+      try {
+        await codemode.oversized();
+        return "unexpected";
+      } catch (e) {
+        return "caught:" + e.message;
+      }
+    }`,
+    { oversized: async () => "x".repeat(6 * 1024 * 1024) },
+  );
+  assert.equal(r.error, undefined);
+  assert.equal(r.result, "caught:Tool result exceeded sandbox memory limit");
+});
+
+test("settle() fatal OOM aborts immediately without unhandledRejection and preserves subsequent runs", async () => {
+  const unhandled: unknown[] = [];
+  const onUnhandled = (reason: unknown) => {
+    unhandled.push(reason);
+  };
+  process.on("unhandledRejection", onUnhandled);
+  try {
+    const small = new QuickJSExecutor({ timeoutMs: 10_000, memoryLimitBytes: 1536 * 1024 });
+    let hostReturned = false;
+    const t0 = Date.now();
+    const r = await small.execute(
+      `async () => {
+        let spare = new Uint8Array(256);
+        const p = codemode.delayedBig();
+        const buckets = [];
+        for (const sz of [65536, 4096, 512, 256]) {
+          const b = [];
+          buckets.push(b);
+          try { for (;;) b.push(new Uint8Array(sz)); } catch {}
+        }
+        spare = null;
+        return await p;
+      }`,
+      {
+        delayedBig: () =>
+          new Promise((resolve) =>
+            setTimeout(() => {
+              hostReturned = true;
+              resolve("x".repeat(2 * 1024 * 1024));
+            }, 30),
+          ),
+      },
+    );
+    const elapsed = Date.now() - t0;
+    assert.equal(hostReturned, true);
+    assert.ok(elapsed < 2_000, `expected immediate abort, took ${elapsed}ms`);
+    assert.match(r.error ?? "", /out of memory/i);
+    assert.equal(unhandled.length, 0);
+
+    const followUp = await small.execute("async () => codemode.add({ x: 20, y: 22 })", fns);
+    assert.equal(followUp.error, undefined);
+    assert.equal(followUp.result, 42);
+  } finally {
+    process.off("unhandledRejection", onUnhandled);
+  }
+});

@@ -14,7 +14,7 @@ import type { Executor } from "@cloudflare/codemode";
 import type { Isolation } from "./executor/default.ts";
 import type { PooledWorkerExecutorOptions } from "./executor/pool-executor.ts";
 import { collisions, policyAllows, withPolicy, type ToolPolicy } from "./policy.ts";
-import { typesFor } from "./discovery.ts";
+import { typesFor } from "./discovery-core.ts";
 import { sanitizeToolName } from "./vendor/cf-utils.ts";
 import { HELPERS_DOC } from "./helpers.ts";
 import { bindMcpCleanup, closeAll, connectMcpResources } from "./mcp-resources.ts";

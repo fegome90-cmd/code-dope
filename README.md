@@ -62,6 +62,8 @@ const r = await runner.run(paginatedFilter.build({ namespace: "notes", listTool:
 // r.result, r.error, r.logs, r.audit
 ```
 
+Llama a `await runner.close()` para liberar limpiamente los workers cuando uses `isolation: "pool"`. `close()` es idempotente y marca el runner como cerrado (las llamadas posteriores a `run()` devuelven `"CodeRunner is closed"`); bajo `isolation: "worker"` o `"inline"` no cancela ejecuciones ya en curso.
+
 Ejemplo completo en `examples/plugin-consumer/` (`npm run example:plugin`). Cliente MCP real por stdio en `examples/mcp-client/` (`npm run example:mcp`).
 
 ### Dentro del sandbox

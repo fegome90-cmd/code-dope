@@ -15,7 +15,7 @@
  * they never keep the process alive; call `close()` to stop the pool explicitly.
  */
 import { Worker } from "node:worker_threads";
-import type { ExecuteOptions, ExecuteResult, Executor, ResolvedProvider } from "@cloudflare/codemode";
+import type { ExecuteOptions, ExecuteResult, Executor, ResolvedProvider } from "../types.ts";
 import { WORKER_ENTRY, type WorkerExecutorOptions } from "./worker-executor.ts";
 import { providerSpecs, runCall, toProviders, type CallMsg, type Fns } from "./worker-bridge.ts";
 

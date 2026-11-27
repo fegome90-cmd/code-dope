@@ -1,17 +1,19 @@
+/**
+ * Progressive tool discovery for large catalogs: instead of putting every
+ * tool's types in the tool description (what codeMcpServer does), expose
+ *   - search_tools({ query, limit }) → matching tools + TypeScript types for them only
+ *   - execute({ code })              → run code against the whole (policy-guarded) catalog
+ *
+ * Pattern from Cloudflare's search/describe/execute and Anthropic's Tool
+ * Search; ranking is plain lexical scoring (no embeddings) on purpose.
+ */
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Executor } from "@cloudflare/codemode";
 import type { Isolation } from "./executor/default.ts";
 import type { PooledWorkerExecutorOptions } from "./executor/pool-executor.ts";
 import { type ToolPolicy } from "./policy.ts";
-export interface ToolEntry {
-    name: string;
-    description?: string;
-    inputSchema?: unknown;
-}
-/** Rank tools by word overlap with the query (name weighted 3x description). Empty query → no results. */
-export declare function searchTools(catalog: ToolEntry[], query: string, limit?: number): ToolEntry[];
-/** TypeScript declarations for a subset of tools (Cloudflare generator, vendored). */
-export declare function typesFor(tools: ToolEntry[], ambiguous?: Set<string>): string;
+import { searchTools, typesFor, type ToolEntry } from "./discovery-core.ts";
+export { searchTools, typesFor, type ToolEntry };
 export interface SearchExecuteOptions {
     upstream: McpServer;
     policy: ToolPolicy;

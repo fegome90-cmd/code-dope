@@ -2,7 +2,7 @@
  * createCodeRunner: the one-call entry point for plugins and other in-process
  * consumers that already have tool functions (no MCP needed).
  */
-import type { ExecuteResult } from "@cloudflare/codemode";
+import type { ExecuteResult } from "./types.ts";
 import { type Isolation } from "./executor/default.ts";
 import type { PooledWorkerExecutorOptions } from "./executor/pool-executor.ts";
 import { type AuditRecord, type ToolPolicy } from "./policy.ts";
@@ -21,6 +21,15 @@ export interface CodeRunResult extends ExecuteResult {
 }
 export interface CodeRunner {
     run(code: string): Promise<CodeRunResult>;
+    /**
+     * Closes this runner permanently and disposes its internally owned executor if supported.
+     *
+     * Idempotent: concurrent or repeated calls return the same promise. Sets terminal state
+     * synchronously so subsequent `run()` calls fail closed with `"CodeRunner is closed"`.
+     * Under `isolation: "pool"`, terminates active/queued workers and awaits cleanup; under
+     * `"worker"` or `"inline"`, resolves immediately without cancelling in-flight runs.
+     */
+    close(): Promise<void>;
 }
 export declare function createCodeRunner(o: CodeRunnerOptions): CodeRunner;
 export {};

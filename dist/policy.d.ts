@@ -11,7 +11,7 @@
  *
  * Works with any `Executor` (QuickJSExecutor, Cloudflare's DynamicWorkerExecutor, …).
  */
-import type { Executor } from "@cloudflare/codemode";
+import type { Executor } from "./types.ts";
 export type ToolKind = "read" | "write";
 type Fn = (...args: unknown[]) => Promise<unknown>;
 type Fns = Record<string, Fn>;

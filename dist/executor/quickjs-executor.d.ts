@@ -1,4 +1,4 @@
-import type { ExecuteResult, Executor, ResolvedProvider } from "@cloudflare/codemode";
+import type { ExecuteResult, Executor, ResolvedProvider } from "../types.ts";
 export interface QuickJSExecutorOptions {
     /** Wall-clock limit for the whole execution, including waits on tools. Default 30_000. */
     timeoutMs?: number;

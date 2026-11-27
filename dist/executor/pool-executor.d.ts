@@ -1,4 +1,4 @@
-import type { ExecuteOptions, ExecuteResult, Executor, ResolvedProvider } from "@cloudflare/codemode";
+import type { ExecuteOptions, ExecuteResult, Executor, ResolvedProvider } from "../types.ts";
 import { type WorkerExecutorOptions } from "./worker-executor.ts";
 import { type Fns } from "./worker-bridge.ts";
 export interface PooledWorkerExecutorOptions extends WorkerExecutorOptions {

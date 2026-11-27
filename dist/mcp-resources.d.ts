@@ -139,7 +139,7 @@ export declare function connectMcpResources(o: Options): Promise<{
         }[] | undefined;
         title?: string | undefined;
     }[];
-    inner: Executor;
+    inner: import("./types.ts").Executor;
     close: () => Promise<void>;
 }>;
 /** Explicit close awaits cleanup; transport disconnect also starts it exactly once. */

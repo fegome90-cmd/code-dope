@@ -171,14 +171,109 @@ test("pool: createCodeRunner with isolation 'pool' runs tools under policy", asy
     executor: { timeoutMs: 2000 },
     isolation: "pool",
   });
-  const r = await runner.run("async () => [await t.get(), typeof process, await t.w().catch((e) => e.message)]");
   try {
+    const r = await runner.run("async () => [await t.get(), typeof process, await t.w().catch((e) => e.message)]");
     assert.equal(r.error, undefined);
     const [a, b, c] = r.result as string[];
     assert.equal(a, "from-parent");
     assert.equal(b, "undefined");
     assert.match(c, /Denied/);
   } finally {
-    // The runner does not expose its executor; the pool must not keep the process alive past idleMs/unref.
+    await runner.close();
+  }
+});
+
+test("runner: pool close() terminates active/queued runs, is idempotent, and rejects subsequent run()", async () => {
+  const runner = createCodeRunner({
+    tools: { t: { hang: () => new Promise(() => {}) } },
+    policy: { read: ["hang"] },
+    executor: { size: 1, idleMs: 0, timeoutMs: 5000 },
+    isolation: "pool",
+  });
+  const active = runner.run("async () => t.hang()");
+  const queued = runner.run("async () => t.hang()");
+  await sleep(100);
+  const c1 = runner.close();
+  const c2 = runner.close();
+  assert.equal(c1, c2);
+  await c1;
+  await runner.close();
+
+  const [rActive, rQueued] = await Promise.all([active, queued]);
+  assert.ok(rActive.error);
+  assert.ok(rQueued.error);
+
+  const after = await runner.run("async () => 1");
+  assert.deepEqual(after, {
+    result: undefined,
+    error: "CodeRunner is closed",
+    logs: [],
+    audit: [],
+    durationMs: 0,
+  });
+});
+
+for (const isolation of ["worker", "inline"] as const) {
+  test(`runner (${isolation}): close() is idempotent, marks terminal state, and does not cancel in-flight run()`, async () => {
+    let resolveGate!: (v: string) => void;
+    let enteredResolve!: () => void;
+    const gate = new Promise<string>((r) => { resolveGate = r; });
+    const entered = new Promise<void>((r) => { enteredResolve = r; });
+
+    const runner = createCodeRunner({
+      tools: { t: { wait: async () => { enteredResolve(); return gate; } } },
+      policy: { read: ["wait"] },
+      executor: { timeoutMs: 5000 },
+      isolation,
+    });
+
+    const inflight = runner.run("async () => t.wait()");
+    await entered;
+
+    const c1 = runner.close();
+    const c2 = runner.close();
+    assert.equal(c1, c2);
+    await c1;
+    await runner.close();
+
+    const after = await runner.run("async () => 1");
+    assert.deepEqual(after, {
+      result: undefined,
+      error: "CodeRunner is closed",
+      logs: [],
+      audit: [],
+      durationMs: 0,
+    });
+
+    resolveGate("finished");
+    const r = await inflight;
+    assert.equal(r.error, undefined);
+    assert.equal(r.result, "finished");
+    assert.equal(r.audit.length, 1);
+  });
+}
+
+test("runner: async policy.audit rejection is contained and still records result.audit", async () => {
+  const unhandled: unknown[] = [];
+  const onUnhandled = (reason: unknown) => { unhandled.push(reason); };
+  process.on("unhandledRejection", onUnhandled);
+  const runner = createCodeRunner({
+    tools: { t: { get: async () => "ok" } },
+    policy: {
+      read: ["get"],
+      audit: (() => Promise.reject(new Error("sink down"))) as unknown as () => void,
+    },
+    isolation: "inline",
+  });
+  try {
+    const r = await runner.run("async () => t.get()");
+    await sleep(20);
+    assert.equal(r.error, undefined);
+    assert.equal(r.result, "ok");
+    assert.equal(r.audit.length, 1);
+    assert.equal(unhandled.length, 0);
+  } finally {
+    process.off("unhandledRejection", onUnhandled);
+    await runner.close();
   }
 });

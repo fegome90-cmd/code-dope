@@ -11,7 +11,7 @@
  *
  * Works with any `Executor` (QuickJSExecutor, Cloudflare's DynamicWorkerExecutor, …).
  */
-import type { ExecuteResult, Executor, ResolvedProvider } from "@cloudflare/codemode";
+import type { ExecuteResult, Executor, ResolvedProvider } from "./types.ts";
 import { sanitizeToolName } from "./vendor/cf-utils.ts";
 
 export type ToolKind = "read" | "write";
@@ -118,11 +118,14 @@ export function policyAllows(p: ToolPolicy, provider: string, tool: string, ambi
 
 function runValidator(v: ArgValidator, args: unknown): string | undefined {
   if (typeof v === "function") {
-    const r = v(args);
-    return r === true || r === undefined ? undefined : r;
+    const r = (v as (a: unknown) => unknown)(args);
+    if (r === true || r === undefined) return undefined;
+    if (typeof r === "string") return r.length > 0 ? r : "invalid arguments";
+    return "invalid arguments";
   }
   const r = v.safeParse(args);
-  return r.success ? undefined : (r.error?.message ?? "invalid arguments");
+  if (r.success) return undefined;
+  return r.error?.message ? r.error.message : "invalid arguments";
 }
 
 function size(v: unknown): number {
@@ -207,7 +210,7 @@ export function guardFns(provider: string, fns: Fns, policy: ToolPolicy, state: 
         } catch (e) {
           problem = `validator threw: ${e instanceof Error ? e.message : String(e)}`;
         }
-        if (problem) {
+        if (problem !== undefined) {
           release();
           deny(`invalid arguments: ${problem}`);
         }

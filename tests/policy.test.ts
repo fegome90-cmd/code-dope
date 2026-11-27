@@ -90,3 +90,36 @@ test("createCodeRunner returns result + audit", async () => {
   assert.equal(r.result, "A");
   assert.equal(r.audit.length, 1);
 });
+
+test("argument validation fails closed on falsy and empty failure values", async () => {
+  let calls = 0;
+  const counted = {
+    fn_empty: async () => { calls++; return "ok"; },
+    fn_false: async () => { calls++; return "ok"; },
+    fn_true: async () => { calls++; return "ok-true"; },
+    fn_undef: async () => { calls++; return "ok-undef"; },
+    sp_empty: async () => { calls++; return "ok"; },
+    sp_ok: async () => { calls++; return "ok-sp"; },
+  };
+  const ex = withPolicy(base, {
+    read: ["fn_empty", "fn_false", "fn_true", "fn_undef", "sp_empty", "sp_ok"],
+    validate: {
+      fn_empty: () => "",
+      fn_false: (() => false) as unknown as () => true,
+      fn_true: () => true,
+      fn_undef: () => undefined,
+      sp_empty: { safeParse: () => ({ success: false, error: { message: "" } }) },
+      sp_ok: { safeParse: () => ({ success: true }) },
+    },
+  });
+
+  assert.match((await ex.execute("async () => codemode.fn_empty()", counted)).error ?? "", /invalid arguments/);
+  assert.match((await ex.execute("async () => codemode.fn_false()", counted)).error ?? "", /invalid arguments/);
+  assert.match((await ex.execute("async () => codemode.sp_empty()", counted)).error ?? "", /invalid arguments/);
+  assert.equal(calls, 0);
+
+  assert.equal((await ex.execute("async () => codemode.fn_true()", counted)).result, "ok-true");
+  assert.equal((await ex.execute("async () => codemode.fn_undef()", counted)).result, "ok-undef");
+  assert.equal((await ex.execute("async () => codemode.sp_ok()", counted)).result, "ok-sp");
+  assert.equal(calls, 3);
+});

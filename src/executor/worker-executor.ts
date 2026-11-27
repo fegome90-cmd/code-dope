@@ -9,7 +9,7 @@
  * only sends {provider, tool, args} messages and receives results.
  */
 import { Worker } from "node:worker_threads";
-import type { ExecuteOptions, ExecuteResult, Executor, ResolvedProvider } from "@cloudflare/codemode";
+import type { ExecuteOptions, ExecuteResult, Executor, ResolvedProvider } from "../types.ts";
 import type { QuickJSExecutorOptions } from "./quickjs-executor.ts";
 import { providerSpecs, runCall, toProviders, type CallMsg, type Fns } from "./worker-bridge.ts";
 

@@ -11,7 +11,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { codeMcpServer } from "@cloudflare/codemode/mcp";
 import { collisions, policyAllows, withPolicy } from "./policy.js";
-import { typesFor } from "./discovery.js";
+import { typesFor } from "./discovery-core.js";
 import { sanitizeToolName } from "./vendor/cf-utils.js";
 import { HELPERS_DOC } from "./helpers.js";
 import { bindMcpCleanup, closeAll, connectMcpResources } from "./mcp-resources.js";

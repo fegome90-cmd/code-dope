@@ -1,5 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { createCodeModeMcpServer, createSearchExecuteMcpServer } from "../src/mcp.ts";
@@ -52,4 +55,46 @@ test("progressive discovery keeps the initial tool context small vs. all-types-i
   const ratio = fullChars / progChars;
   console.log(`listTools chars: codeMcpServer=${fullChars} searchExecute=${progChars} full/progressive=${ratio.toFixed(2)}x`);
   assert.ok(ratio >= 20, `Expected at least 20x smaller initial tool context; observed ${ratio.toFixed(2)}x`);
+});
+
+function collectModuleSpecifiers(source: string): string[] {
+  const specs: string[] = [];
+  const pattern = /(?:^|\s)(?:import|export)\s+(?:[^"'`]*?\s+from\s+)?["']([^"']+)["']|\bimport\s*\(\s*["']([^"']+)["']\s*\)/gm;
+  for (const match of source.matchAll(pattern)) {
+    const spec = match[1] ?? match[2];
+    if (spec) specs.push(spec);
+  }
+  return specs;
+}
+
+test("root entrypoint graph (src/index.ts -> src/discovery-core.ts) has zero MCP or Zod imports", () => {
+  const srcDir = fileURLToPath(new URL("../src/", import.meta.url));
+  const corePath = resolve(srcDir, "discovery-core.ts");
+  const coreSource = readFileSync(corePath, "utf8");
+  const coreSpecs = collectModuleSpecifiers(coreSource);
+  for (const spec of coreSpecs) {
+    assert.ok(
+      spec !== "zod" && !spec.startsWith("zod/") && spec !== "@modelcontextprotocol/sdk" && !spec.startsWith("@modelcontextprotocol/sdk/") && !spec.startsWith("node:") && !spec.endsWith("mcp-resources.ts"),
+      `Forbidden import ${spec} in src/discovery-core.ts`,
+    );
+  }
+
+  const visited = new Set<string>();
+  const queue = [resolve(srcDir, "index.ts")];
+  while (queue.length > 0) {
+    const file = queue.pop()!;
+    if (visited.has(file)) continue;
+    visited.add(file);
+    const source = readFileSync(file, "utf8");
+    for (const spec of collectModuleSpecifiers(source)) {
+      assert.ok(
+        spec !== "zod" && !spec.startsWith("zod/") && spec !== "@modelcontextprotocol/sdk" && !spec.startsWith("@modelcontextprotocol/sdk/"),
+        `Root entrypoint graph must not import ${spec} (found in ${file})`,
+      );
+      if (spec.startsWith("./") || spec.startsWith("../")) {
+        queue.push(resolve(dirname(file), spec));
+      }
+    }
+  }
+  assert.ok(visited.has(corePath), "src/index.ts graph must include src/discovery-core.ts");
 });

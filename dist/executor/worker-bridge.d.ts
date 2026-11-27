@@ -3,7 +3,7 @@
  * PooledWorkerExecutor. The worker sends {provider, tool, args}; the parent runs
  * the real tool function (credentials stay here) and replies with JSON data only.
  */
-import type { ResolvedProvider } from "@cloudflare/codemode";
+import type { ResolvedProvider } from "../types.ts";
 export type Fns = Record<string, (...args: unknown[]) => Promise<unknown>>;
 export interface CallMsg {
     type: "call";
