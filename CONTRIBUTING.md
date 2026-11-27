@@ -18,12 +18,14 @@ El bootstrap #1 y el arreglo del escáner #4 ya están integrados; las ramas per
 
 ## Hooks de pre-commit
 
-Necesitas `uv` 0.13.9 y `gitleaks` en el PATH, además de Node 24 y npm 11.19.1. La distribución no incluye el script `prepare` (lo verifica `tests/package.test.ts`), así que instala el hook una vez por checkout con `npm exec husky`; en worktrees ejecuta además `git config extensions.worktreeConfig true` y `git config --worktree core.hooksPath .husky/_` para no compartir la configuración con `main`. En cada `git commit` se ejecuta:
+Necesitas `uv` 0.13.9 y `gitleaks` en el PATH, además de npm 11.19.1. Node 24 es la línea de CI y del hook (`.node-version`); `engines` declara 22.18 como mínimo soportado por la librería. La distribución no incluye el script `prepare` (lo verifica `tests/package.test.ts`), así que instala el hook una vez por checkout con `bash scripts/install-hooks.sh`: preserva cualquier `core.hooksPath` previo en la configuración local compartida y aplica el override sólo a este worktree. El script habilita `extensions.worktreeConfig` en la configuración compartida; es un cambio duradero y necesario para que el override por worktree funcione. En cada `git commit` se ejecuta:
 
-1. `npm exec lint-staged`: Biome sobre código/JSON staged, `npm run typecheck` sobre el estado staged (no sobre el disco), markdownlint sobre Markdown staged y codespell con la whitelist de `config/codespell-ignore.txt`.
+1. `npm exec lint-staged`: Biome sobre código/JSON staged, `npm run typecheck:staged` sobre TS/TSX staged (typecheck más la guarda del índice), `npm run typecheck` cuando se stagea `tsconfig*.json`, markdownlint sobre Markdown staged y codespell con la whitelist de `config/codespell-ignore.txt`.
 2. `bash scripts/check-secrets.sh staged`: el mismo escaneo de secretos que exige esta guía.
 
-El typecheck vive dentro de lint-staged a propósito: corre mientras los cambios no staged están ocultos, así un archivo corregido en disco pero no stageado no puede disimular un error de tipos en el commit. El hook no ejecuta `npm run test:all` (es lento y CI ya lo corre) y NO sustituye a CI ni autoriza merge. Si el hook no está instalado, ejecuta esos dos comandos manualmente antes de subir. `git commit --no-verify` es una excepción explícita: no exime del escaneo de secretos ni de los checks de CI.
+El typecheck vive dentro de lint-staged a propósito: corre mientras los cambios no staged están ocultos, así un archivo corregido en disco pero no stageado no puede disimular un error de tipos en el commit. Se dispara también cuando se stagea `tsconfig*.json`, y `scripts/check-staged-imports.mjs` rechaza imports relativos que sólo resuelven en el disco y no están en el índice. El hook no garantiza un checkout limpio completo: eso lo cubre `npm run test:all` en CI.
+
+Las excepciones de los linters están acotadas y documentadas: Biome no aplica el formatter ni ocho reglas porque el codebase existente no está formateado; markdownlint desactiva dieciséis reglas por la documentación histórica; la whitelist de codespell contiene palabras españolas válidas. No se agregaron nuevas exclusiones sin una razón verificable en este repo. El hook no ejecuta `npm run test:all` (es lento y CI ya lo corre) y NO sustituye a CI ni autoriza merge. Si el hook no está instalado, ejecuta esos dos comandos manualmente antes de subir. `git commit --no-verify` es una excepción explícita: no exime del escaneo de secretos ni de los checks de CI.
 
 ## Pull request y merge
 

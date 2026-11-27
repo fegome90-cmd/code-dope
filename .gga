@@ -4,7 +4,7 @@
 PROVIDER="claude"
 
 # Archivos de código y configuración revisados en este repo.
-FILE_PATTERNS="*.ts,*.tsx,*.js,*.mjs,*.json,*.jsonc,*.md,*.yml,*.toml,*.txt,*.sh,.*rc,pre-commit"
+FILE_PATTERNS="*.ts,*.tsx,*.js,*.mjs,*.json,*.jsonc,*.md,*.yml,*.yaml,*.toml,*.txt,*.sh,.*rc,pre-commit"
 EXCLUDE_PATTERNS="package-lock.json,*.lock"
 
 RULES_FILE="AGENTS.md"

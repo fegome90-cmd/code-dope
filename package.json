@@ -21,11 +21,11 @@
   "scripts": {
     "test": "node scripts/test.mjs",
     "typecheck": "tsc --noEmit",
+    "typecheck:staged": "npm run typecheck && node scripts/check-staged-imports.mjs",
     "lint:code": "biome check .",
     "lint:md": "markdownlint-cli2",
     "lint:spell": "uvx --from codespell==2.4.3 codespell",
     "lint": "npm run lint:code && npm run lint:md && npm run lint:spell",
-    "format": "biome format --write .",
     "bench": "node bench/run.ts",
     "example:plugin": "node examples/plugin-consumer/run.ts",
     "example:mcp": "node examples/mcp-client/run.ts",

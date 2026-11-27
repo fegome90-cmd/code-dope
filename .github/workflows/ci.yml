@@ -67,13 +67,14 @@ jobs:
           node-version-file: .node-version
       - run: npm install --global npm@11.19.1 --ignore-scripts
       - run: npm ci --ignore-scripts
-      - run: npm run lint
       - uses: astral-sh/setup-uv@v7
         with:
           version: "0.13.9"
           python-version: "3.13"
+      - run: npm run lint
       - run: uvx --from yamllint==1.38.0 yamllint .
       - run: uvx --from shellcheck-py==0.11.0.1 shellcheck scripts/check-secrets.sh
+      - run: uvx --from shellcheck-py==0.11.0.1 shellcheck scripts/install-hooks.sh
       - run: uvx --from shellcheck-py==0.11.0.1 shellcheck .husky/pre-commit
   docs:
     name: Documentation links and references
