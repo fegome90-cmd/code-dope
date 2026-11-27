@@ -86,6 +86,38 @@ export function collisions(names: string[]): Set<string> {
   return new Set([...groups.values()].filter((group) => group.length > 1).flat());
 }
 
+/** Reject single-catalog rules that look qualified but actually name a dotted tool. */
+export function validatePolicyPrefixes(
+  policy: ToolPolicy,
+  providers: ReadonlyArray<{ name: string; fns: Record<string, unknown> }>,
+): void {
+  const providerNames = new Set(providers.map((provider) => provider.name));
+  const rules = [
+    ...(policy.deny ?? []).map((entry) => ({ entry, isDeny: true })),
+    ...[...(policy.read ?? []), ...(policy.write ?? []), ...Object.keys(policy.validate ?? {})]
+      .map((entry) => ({ entry, isDeny: false })),
+  ];
+  const catalog = providers.map(({ name, fns }) => {
+    const names = Object.keys(fns);
+    return { provider: name, names, ambiguous: collisions(names) };
+  });
+  for (const { entry, isDeny } of rules) {
+    const dot = entry.indexOf(".");
+    if (dot <= 0) continue;
+    const prefix = entry.slice(0, dot);
+    if (providerNames.has(prefix)) continue;
+    const alias = sanitizeToolName(entry);
+    for (const { provider, names, ambiguous } of catalog) {
+      for (const tool of names) {
+        const sanitizedHit = (isDeny || !ambiguous.has(tool)) && tool.includes(".") && sanitizeToolName(tool) === alias;
+        if (tool === entry || sanitizedHit) {
+          throw new PolicyError(`Policy rule ${JSON.stringify(entry)} uses unknown provider prefix ${JSON.stringify(prefix)} while matching tool ${JSON.stringify(tool)}; qualify it as ${JSON.stringify(`${provider}.${tool}`)}`);
+        }
+      }
+    }
+  }
+}
+
 /** Exact allowlist matching for ambiguous names; deny lists always use sanitization. */
 export function matches(list: string[] | undefined, provider: string, tool: string, { exact = false } = {}): boolean {
   if (!list) return false;
@@ -269,6 +301,14 @@ export function withPolicy(inner: Executor, policy: ToolPolicy): Executor {
       // would bypass these wrappers, so refuse them (fail-closed).
       if (options?.connectors?.length) {
         return { result: undefined, error: "withPolicy: connector bindings bypass the policy layer and are not allowed", logs: [] };
+      }
+      if (!Array.isArray(providersOrFns)) {
+        try {
+          validatePolicyPrefixes(policy, [{ name: "codemode", fns: providersOrFns }]);
+        } catch (e) {
+          if (e instanceof PolicyError) return { result: undefined, error: `PolicyError: ${e.message}`, logs: [] };
+          throw e;
+        }
       }
       const state = { calls: 0, seq: 0, closed: false, abort: new AbortController() };
       const guarded: ResolvedProvider[] | Fns = Array.isArray(providersOrFns)

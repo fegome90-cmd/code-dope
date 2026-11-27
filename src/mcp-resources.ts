@@ -1,14 +1,17 @@
-/** Shared connection and ownership rules for the two MCP adapters. */
+/** Shared upstream calls, response formatting and ownership rules for the MCP adapters. */
 import type { Executor } from "@cloudflare/codemode";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import { AjvJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/ajv";
+import type { ToolEntry } from "./discovery-core.ts";
 import { createDefaultExecutor, type Isolation } from "./executor/default.ts";
 import { PooledWorkerExecutor, type PooledWorkerExecutorOptions } from "./executor/pool-executor.ts";
 
 type Options = { upstream: McpServer; executor?: Executor; isolation?: Isolation; executorOptions?: PooledWorkerExecutorOptions };
+type CallToolResult = Awaited<ReturnType<Client["callTool"]>>;
+type McpResources = Awaited<ReturnType<typeof connectMcpResources>>;
 
 export async function closeAll(operations: Array<() => Promise<void>>): Promise<void> {
   const results = await Promise.allSettled(operations.map((close) => Promise.resolve().then(close)));
@@ -67,6 +70,37 @@ export async function connectMcpResources(o: Options) {
     await close().catch(() => {});
     throw error;
   }
+}
+
+/** Keeps the Cloudflare compatibility result first, followed by standard MCP representations. */
+export function unwrapMcpResult(result: CallToolResult): unknown {
+  if ("toolResult" in result) return result.toolResult;
+  const content = (result.content ?? []) as Array<{ type: string; text?: string }>;
+  const text = () => content.filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
+  if (result.isError) throw new Error(text() || "Tool call failed");
+  if (result.structuredContent != null) return result.structuredContent;
+  if (content.length > 0 && content.every((c) => c.type === "text")) {
+    try {
+      return JSON.parse(text());
+    } catch {
+      return text();
+    }
+  }
+  return result;
+}
+
+export function buildUpstreamFns(tools: ToolEntry[], callTool: McpResources["callTool"]): Record<string, (args: unknown) => Promise<unknown>> {
+  // Keep original names for policy matching; the executor resolves aliases.
+  return Object.fromEntries(tools.map(({ name }) => [
+    name,
+    async (args: unknown) => unwrapMcpResult(await callTool({ name, arguments: (args ?? {}) as Record<string, unknown> })),
+  ]));
+}
+
+export function formatMcpResponse(text: string, maxChars: number, isError = false) {
+  const marker = "…[truncated]";
+  if (text.length > maxChars) text = maxChars < marker.length ? marker.slice(0, maxChars) : text.slice(0, maxChars - marker.length) + marker;
+  return { content: [{ type: "text" as const, text }], ...(isError ? { isError: true } : {}) };
 }
 
 /** Explicit close awaits cleanup; transport disconnect also starts it exactly once. */

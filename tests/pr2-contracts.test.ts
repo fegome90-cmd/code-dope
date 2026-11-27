@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createCodeRunner, createDefaultExecutor, guardFns, guardedBulkUpdate, paginatedFilter, WorkerExecutor, type AuditRecord } from "../src/index.ts";
+import { createCodeRunner, createDefaultExecutor, guardFns, guardedBulkUpdate, paginatedFilter, withPolicy, WorkerExecutor, type AuditRecord, type Executor } from "../src/index.ts";
 import { createPlugin } from "../examples/plugin-consumer/plugin.ts";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -37,6 +37,21 @@ for (const colliding of [false, true]) test(`provider scope cannot authorize or 
   assert.equal(await guarded[colliding ? "crm.get" : "crm_get"]({}), colliding ? "dotted" : "underscore");
   const rejected = guardFns("mail", fns, { read: [local], validate: { [local]: () => "invalid local input" } });
   await assert.rejects(rejected[colliding ? "crm.get" : "crm_get"]({}), /invalid local input/);
+});
+
+test("explicit provider arrays preserve provider scope even for a single dotted tool", async () => {
+  const code = "async () => mail['crm.get']({})";
+  const mockExecutor: Executor = {
+    async execute(source, providers) {
+      assert.equal(source, code);
+      assert.ok(Array.isArray(providers));
+      return { result: await providers[0].fns["crm.get"]({}), logs: [] };
+    },
+  };
+  const result = await withPolicy(mockExecutor, {
+    read: ["mail.crm.get"], deny: ["crm.get"], validate: { "crm.get": () => "wrong provider" },
+  }).execute(code, [{ name: "mail", fns: { "crm.get": async () => "mail fixture" } }]);
+  assert.deepEqual(result, { result: "mail fixture", logs: [] });
 });
 
 test("caller, validator and approver cannot mutate the executed argument snapshot", async () => {

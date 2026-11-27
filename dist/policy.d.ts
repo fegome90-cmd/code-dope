@@ -73,6 +73,11 @@ export declare class PolicyError extends Error {
 }
 /** Real names that share a sanitized alias with a different tool in one provider. */
 export declare function collisions(names: string[]): Set<string>;
+/** Reject single-catalog rules that look qualified but actually name a dotted tool. */
+export declare function validatePolicyPrefixes(policy: ToolPolicy, providers: ReadonlyArray<{
+    name: string;
+    fns: Record<string, unknown>;
+}>): void;
 /** Exact allowlist matching for ambiguous names; deny lists always use sanitization. */
 export declare function matches(list: string[] | undefined, provider: string, tool: string, { exact }?: {
     exact?: boolean | undefined;

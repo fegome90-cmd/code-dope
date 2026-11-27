@@ -1,7 +1,8 @@
-/** Shared connection and ownership rules for the two MCP adapters. */
+/** Shared upstream calls, response formatting and ownership rules for the MCP adapters. */
 import type { Executor } from "@cloudflare/codemode";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import type { ToolEntry } from "./discovery-core.ts";
 import { type Isolation } from "./executor/default.ts";
 import { type PooledWorkerExecutorOptions } from "./executor/pool-executor.ts";
 type Options = {
@@ -10,6 +11,8 @@ type Options = {
     isolation?: Isolation;
     executorOptions?: PooledWorkerExecutorOptions;
 };
+type CallToolResult = Awaited<ReturnType<Client["callTool"]>>;
+type McpResources = Awaited<ReturnType<typeof connectMcpResources>>;
 export declare function closeAll(operations: Array<() => Promise<void>>): Promise<void>;
 export declare function connectMcpResources(o: Options): Promise<{
     callTool: (params: Parameters<Client["callTool"]>[0], options?: Parameters<Client["callTool"]>[2]) => Promise<{
@@ -142,6 +145,16 @@ export declare function connectMcpResources(o: Options): Promise<{
     inner: import("./types.ts").Executor;
     close: () => Promise<void>;
 }>;
+/** Keeps the Cloudflare compatibility result first, followed by standard MCP representations. */
+export declare function unwrapMcpResult(result: CallToolResult): unknown;
+export declare function buildUpstreamFns(tools: ToolEntry[], callTool: McpResources["callTool"]): Record<string, (args: unknown) => Promise<unknown>>;
+export declare function formatMcpResponse(text: string, maxChars: number, isError?: boolean): {
+    isError?: boolean | undefined;
+    content: {
+        type: "text";
+        text: string;
+    }[];
+};
 /** Explicit close awaits cleanup; transport disconnect also starts it exactly once. */
 export declare function bindMcpCleanup(server: McpServer, dispose: () => Promise<void>): McpServer;
 export {};

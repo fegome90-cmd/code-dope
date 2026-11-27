@@ -47,13 +47,17 @@ test("search/execute server: discovery returns only relevant types, execute runs
   assert.equal((denied as { isError?: boolean }).isError, true);
 });
 
-test("progressive discovery keeps the initial tool context small vs. all-types-in-description", async () => {
-  const full = await connect(await createCodeModeMcpServer({ upstream: bigCatalogServer(80).server, policy: { read: [] } }));
-  const prog = await connect(await createSearchExecuteMcpServer({ upstream: bigCatalogServer(80).server, policy: { read: [] } }));
-  const size = async (c: Client) => JSON.stringify((await c.listTools()).tools).length;
-  const fullChars = await size(full), progChars = await size(prog);
+test("progressive discovery keeps the initial tool context small vs. all-types-in-description", async (t) => {
+  const full = await connect(await createCodeModeMcpServer({ upstream: bigCatalogServer(80).server, policy: { read: ["*"] } }));
+  t.after(() => full.close());
+  const prog = await connect(await createSearchExecuteMcpServer({ upstream: bigCatalogServer(80).server, policy: { read: ["*"] } }));
+  t.after(() => prog.close());
+  const fullTools = (await full.listTools()).tools, progTools = (await prog.listTools()).tools;
+  assert.equal((fullTools[0].description ?? "").match(/: \(input:/g)?.length, 83);
+  assert.match(progTools.find((tool) => tool.name === "search_tools")?.description ?? "", /among 83 available/);
+  const fullChars = JSON.stringify(fullTools).length, progChars = JSON.stringify(progTools).length;
   const ratio = fullChars / progChars;
-  console.log(`listTools chars: codeMcpServer=${fullChars} searchExecute=${progChars} full/progressive=${ratio.toFixed(2)}x`);
+  t.diagnostic(`listTools chars: code=${fullChars} searchExecute=${progChars} full/progressive=${ratio.toFixed(2)}x`);
   assert.ok(ratio >= 20, `Expected at least 20x smaller initial tool context; observed ${ratio.toFixed(2)}x`);
 });
 

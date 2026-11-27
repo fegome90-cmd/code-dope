@@ -5,7 +5,8 @@
 `src/vendor/cf-normalize.ts`, `src/vendor/cf-json-schema-types.ts` and `src/vendor/cf-utils.ts` are copied from
 https://github.com/cloudflare/agents (`packages/codemode/src/normalize.ts`, `json-schema-types.ts`, `utils.ts`),
 commit `841b6fc92816d3369dbef7ed3f39168519409248`. The only changes are the header comments and the import paths.
-`src/discovery.ts#unwrap` follows the same priority order as `unwrapMcpResult` in `packages/codemode/src/mcp.ts` (rewritten).
+`src/mcp-resources.ts#unwrapMcpResult`, shared by both adapters, follows the same priority order as
+`unwrapMcpResult` in `packages/codemode/src/mcp.ts` (rewritten). The `code` tool is registered directly.
 
 License of that code:
 

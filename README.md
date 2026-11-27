@@ -48,9 +48,13 @@ const server = await createCodeModeMcpServer({
 await server.connect(new StdioServerTransport());
 ```
 
-Con catálogos grandes conviene `createSearchExecuteMcpServer`, que expone `search_tools` + `execute` y solo entrega los tipos de las herramientas encontradas.
+El adaptador registra `code` directamente. Su descripción ofrece tipos y un ejemplo solo para las herramientas clasificadas por la política y no denegadas. Con catálogos grandes conviene `createSearchExecuteMcpServer`, que expone `search_tools` + `execute` y solo entrega los tipos de las herramientas encontradas.
+
+`code` entrega resultados como texto JSON (o `undefined` si no hay resultado) y limita las respuestas a 24 000 caracteres, incluido el marcador de truncamiento. Si necesitas JSON completo, filtra o pagina antes de devolver el resultado.
 
 Ambos adaptadores mantienen una sola conexión con el upstream y leen todas las páginas del catálogo, conservando la validación de `outputSchema` y los requisitos de ejecución por tareas. Un cursor repetido falla durante la construcción. Entrega un upstream todavía sin conectar; si ya tiene una conexión, el adaptador la rechaza y la deja intacta. Al cerrar el adaptador o desconectar su consumidor se cierran su conexión y cualquier pool creado internamente. Un `executor` suministrado por el caller sigue siendo responsabilidad del caller. `await server.close()` espera la limpieza; también se limpia si falla la inicialización.
+
+En MCP y en catálogos planos pasados a `withPolicy`, una regla que coincide con el nombre de una herramienta con puntos necesita el prefijo `codemode.`, por ejemplo, `codemode.catalog.lookup`. Un prefijo desconocido en esa regla se rechaza antes de ejecutar código. Los catálogos con proveedores explícitos conservan sus reglas por proveedor.
 
 ### Plugin con herramientas propias (sin MCP)
 
@@ -112,7 +116,7 @@ Workflow: pedidos `pending` de clientes `gold` → ids, totales y suma. 20 corri
 
 El margen de 150 ms del caso tras error queda fuera del intervalo medido. El caso frío crea un pool nuevo por muestra e incluye el arranque en `execute`. Las cifras describen esta máquina y esta carga; no son una promesa de latencia. Code Mode mantuvo las 5 llamadas externas y redujo el volumen enviado al modelo. El ahorro de turnos se deriva del script; tokens reales, tiempo del modelo y calidad del código generado siguen **NOT_VERIFIED**.
 
-El test existente de discovery, con 83 herramientas, midió 39 816 → 1 709 caracteres de `listTools`: **23,30×**, estable en tres corridas y con umbral de regresión de 20×. No es una medición de tokens.
+Con las mismas 83 herramientas sintéticas habilitadas en ambos adaptadores, el test de discovery midió 39 757 → 1 710 caracteres de `listTools`: **23,25×**, con umbral de regresión de 20×. No es una medición de tokens.
 
 ### Carga sostenida (`node bench/soak.ts`)
 
@@ -137,7 +141,7 @@ La revisión del PR añadió [trazas de ciclo de vida acotadas](bench/POOL-LIFEC
 src/executor/                      nivel 3: WorkerExecutor (default), PooledWorkerExecutor (pool), QuickJSExecutor (inline)
 src/policy.ts                      allowlist, aprobación, validación, presupuesto, auditoría
 src/runner.ts                      entrada para plugins
-src/mcp.ts                         adaptador MCP (reutiliza codeMcpServer de Cloudflare)
+src/mcp.ts                         adaptador MCP: registro directo de code
 src/discovery.ts                   search_tools + execute, ranking léxico
 src/sandbox/helpers.js             helpers del sandbox (JS puro)
 src/recipes.ts                     workflows parametrizados

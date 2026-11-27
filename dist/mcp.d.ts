@@ -2,10 +2,9 @@
  * MCP adapter: wrap an existing MCP server behind one Code Mode `code` tool,
  * running in Node with QuickJSExecutor + policy + sandbox helpers.
  *
- * Reuses Cloudflare's `codeMcpServer` (@cloudflare/codemode/mcp, MIT), which
- * handles the public code tool, result unwrapping and response truncation.
- * The bridge supplies a complete catalog without reconnecting the real upstream;
- * shared resources own pagination, output validation and lifecycle cleanup.
+ * Registers the public tool directly from the policy-visible upstream catalog.
+ * Both adapters share pagination, result unwrapping, response formatting,
+ * output validation and lifecycle cleanup.
  */
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Executor } from "@cloudflare/codemode";

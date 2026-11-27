@@ -1,6 +1,6 @@
 /**
  * Progressive tool discovery for large catalogs: instead of putting every
- * tool's types in the tool description (what codeMcpServer does), expose
+ * tool's types in the code tool description, expose
  *   - search_tools({ query, limit }) → matching tools + TypeScript types for them only
  *   - execute({ code })              → run code against the whole (policy-guarded) catalog
  *
