@@ -21,6 +21,11 @@
   "scripts": {
     "test": "node scripts/test.mjs",
     "typecheck": "tsc --noEmit",
+    "typecheck:staged": "npm run typecheck && node scripts/check-staged-imports.mjs",
+    "lint:code": "biome check .",
+    "lint:md": "markdownlint-cli2",
+    "lint:spell": "uvx --from codespell==2.4.3 codespell",
+    "lint": "npm run lint:code && npm run lint:md && npm run lint:spell",
     "bench": "node bench/run.ts",
     "example:plugin": "node examples/plugin-consumer/run.ts",
     "example:mcp": "node examples/mcp-client/run.ts",
@@ -42,9 +47,13 @@
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.6.8",
     "@modelcontextprotocol/sdk": "1.32.2",
     "@types/json-schema": "^7.0.15",
     "@types/node": "^22.0.0",
+    "husky": "9.1.7",
+    "lint-staged": "17.6.2",
+    "markdownlint-cli2": "0.24.1",
     "typescript": "5.9.3",
     "zod": "^4.6.7"
   },

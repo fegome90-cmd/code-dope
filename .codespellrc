@@ -1,0 +1,5 @@
+[codespell]
+# Dependencias, lockfiles, worktrees y la propia whitelist.
+skip = .git,.venv,node_modules,dist,archive,__pycache__,*.lock,package-lock.json,*/package-lock.json,*.svg,config/codespell-ignore.txt,*/config/codespell-ignore.txt,worktrees/*,*/worktrees/*,.worktrees/*,*/.worktrees/*
+# Única fuente de palabras españolas permitidas (una por línea).
+ignore-words = config/codespell-ignore.txt

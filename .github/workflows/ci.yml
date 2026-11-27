@@ -55,6 +55,27 @@ jobs:
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
       - run: bash scripts/check-secrets.sh history
       - run: node --test scripts/scan-staged-secrets.test.mjs
+  lint:
+    name: Config linters
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - run: npm install --global npm@11.19.1 --ignore-scripts
+      - run: npm ci --ignore-scripts
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.13.9"
+          python-version: "3.13"
+      - run: npm run lint
+      - run: uvx --from yamllint==1.38.0 yamllint .
+      - run: uvx --from shellcheck-py==0.11.0.1 shellcheck scripts/check-secrets.sh
+      - run: uvx --from shellcheck-py==0.11.0.1 shellcheck scripts/install-hooks.sh
+      - run: uvx --from shellcheck-py==0.11.0.1 shellcheck .husky/pre-commit
   docs:
     name: Documentation links and references
     runs-on: ubuntu-latest
