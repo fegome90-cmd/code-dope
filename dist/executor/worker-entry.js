@@ -4,6 +4,7 @@
  *  - mode "once": run the job in workerData, post "done", the parent terminates us.
  *  - mode "pool": warm up the WASM module, post "ready", then run jobs received
  *    by message, one at a time. Every job gets a fresh QuickJS runtime/context.
+ *    When retired cleanly, close the parent port and let the worker exit.
  */
 import { parentPort, workerData } from "node:worker_threads";
 import { QuickJSExecutor } from "./quickjs-executor.js";
@@ -41,6 +42,10 @@ async function run(job, code, specs) {
     }
 }
 port.on("message", (m) => {
+    if (m.type === "shutdown") {
+        port.close();
+        return;
+    }
     if (m.type === "job") {
         void run(m.job, m.code, m.providers).then((result) => port.postMessage({ type: "done", job: m.job, result }));
         return;
