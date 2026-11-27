@@ -24,7 +24,8 @@ function resolveRef(ref, root) {
         .map((s) => s.replace(/~1/g, "/").replace(/~0/g, "~"));
     let current = root;
     for (const seg of segments) {
-        if (current === null || typeof current !== "object" || Array.isArray(current) || !Object.hasOwn(current, seg))
+        // Arrays are valid intermediate containers, not terminal schema values.
+        if (current === null || typeof current !== "object" || !Object.hasOwn(current, seg))
             return null;
         current = current[seg];
         if (current === undefined)

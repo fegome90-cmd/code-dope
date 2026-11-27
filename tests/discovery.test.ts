@@ -146,6 +146,22 @@ test("typesFor skips non-array schema metadata and preserves boolean and null ty
   assert.match(types, /d\?: Array<never>;/);
 });
 
+test("schema pointers can traverse array indices but cannot resolve to an array as a schema", () => {
+  const schema: JSONSchema7 = {
+    type: "object",
+    definitions: {
+      tuple: { type: "array", items: [{ type: "string" }] },
+      choices: { anyOf: [{ type: "integer" }, { type: "boolean" }] },
+    },
+    properties: {
+      label: { $ref: "#/definitions/tuple/items/0" },
+      count: { $ref: "#/definitions/choices/anyOf/0" },
+      collection: { $ref: "#/definitions/tuple/items" },
+    },
+  };
+  assert.equal(jsonSchemaToType(schema, "Input"), "type Input = {\n    label?: string;\n    count?: number;\n    collection?: unknown;\n}");
+});
+
 test("schema conversion enforces small visit and text budgets", () => {
   const root: JSONSchema7 = { type: "string" };
   const context = { root, depth: 0, seen: new Set<unknown>(), maxDepth: 5, budget: { remaining: 0 } };

@@ -54,7 +54,8 @@ function resolveRef(
 
   let current: unknown = root;
   for (const seg of segments) {
-    if (current === null || typeof current !== "object" || Array.isArray(current) || !Object.hasOwn(current, seg)) return null;
+    // Arrays are valid intermediate containers, not terminal schema values.
+    if (current === null || typeof current !== "object" || !Object.hasOwn(current, seg)) return null;
     current = (current as Record<string, unknown>)[seg];
     if (current === undefined) return null;
   }
