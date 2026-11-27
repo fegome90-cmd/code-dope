@@ -7,7 +7,7 @@ const names = (buffer) => buffer.toString("utf8").split("\0").filter(Boolean);
 
 // -z evita que Git cite rutas no ASCII, que luego no coincidirían con `git show :ruta`.
 const staged = names(gitRaw("diff", "--cached", "--name-only", "--diff-filter=ACMR", "-z"))
-  .filter((file) => /\.(ts|tsx)$/.test(file));
+  .filter((file) => /\.(ts|tsx)$/.test(file) && !/^dist\/.*\.d\.ts$/.test(file));
 
 if (staged.length === 0) process.exit(0);
 

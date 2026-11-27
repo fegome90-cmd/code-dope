@@ -90,11 +90,11 @@ export function unwrapMcpResult(result) {
     }
     return result;
 }
-export function buildUpstreamFns(tools, callTool) {
+export function buildUpstreamFns(tools, callTool, signal) {
     // Keep original names for policy matching; the executor resolves aliases.
     return Object.fromEntries(tools.map(({ name }) => [
         name,
-        async (args) => unwrapMcpResult(await callTool({ name, arguments: (args ?? {}) })),
+        async (args) => unwrapMcpResult(await callTool({ name, arguments: (args ?? {}) }, signal ? { signal } : undefined)),
     ]));
 }
 export function formatMcpResponse(text, maxChars, isError = false) {

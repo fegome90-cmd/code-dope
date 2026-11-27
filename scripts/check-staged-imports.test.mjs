@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -68,4 +68,13 @@ test("rutas no ASCII se manejan sin stack trace", (t) => {
   assert.equal(result.status, 1);
   assert.match(result.stderr, /no está en el índice/);
   assert.doesNotMatch(result.stderr, /Error:|at /);
+});
+
+test("positivo: declaraciones emitidas en dist/**/*.d.ts se excluyen de la guarda", (t) => {
+  const dir = repo(t);
+  mkdirSync(join(dir, "dist"));
+  writeFileSync(join(dir, "dist/b.d.ts"), "export type B = number;\n");
+  writeFileSync(join(dir, "dist/a.d.ts"), 'import type { B } from "./b.ts";\nexport type A = B;\n');
+  git(dir, "add", "dist/a.d.ts", "dist/b.d.ts");
+  assert.equal(run(dir).status, 0);
 });

@@ -187,3 +187,39 @@ test("real stdio MCP server process (examples/mcp-server) works end to end", asy
   assert.ok(audits.some((a) => a.tool === "list_orders" && a.decision === "allowed"));
   assert.ok(audits.some((a) => a.tool === "update_order" && a.decision === "denied"));
 });
+
+test("MCP client request cancellation forwards AbortSignal to upstream tools", async () => {
+  for (const kind of ["code", "execute"] as const) {
+    let upstreamSignal: AbortSignal | undefined;
+    let markStarted!: () => void;
+    const started = new Promise<void>((resolve) => { markStarted = resolve; });
+    const upstream = new McpServer({ name: `abort-${kind}`, version: "1.0.0" });
+    upstream.registerTool("slow", { description: "Wait until aborted.", inputSchema: {} }, (_args, extra) => {
+      upstreamSignal = extra.signal;
+      markStarted();
+      return new Promise((_, reject) => {
+        if (extra.signal.aborted) reject(new Error("aborted"));
+        else extra.signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
+      });
+    });
+    const server = kind === "code"
+      ? await createCodeModeMcpServer({ upstream, policy: { read: ["slow"] }, executorOptions: { timeoutMs: 2_000 } })
+      : await createSearchExecuteMcpServer({ upstream, policy: { read: ["slow"] }, executorOptions: { timeoutMs: 2_000 } });
+    const client = await connect(server);
+    try {
+      const ac = new AbortController();
+      const pending = client.callTool(
+        { name: kind, arguments: { code: "async () => codemode.slow({})" } },
+        undefined,
+        { signal: ac.signal },
+      );
+      await started;
+      assert.equal(upstreamSignal?.aborted, false);
+      ac.abort();
+      await assert.rejects(pending);
+      assert.equal(upstreamSignal?.aborted, true);
+    } finally {
+      await client.close();
+    }
+  }
+});

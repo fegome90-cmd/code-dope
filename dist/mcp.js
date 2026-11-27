@@ -41,9 +41,9 @@ export async function createCodeModeMcpServer(o) {
             .replace(/\{\{(types|example)\}\}/g, (_, key) => key === "types" ? typesText : exampleText);
         const server = new McpServer({ name: "code-dope", version: "0.1.0" });
         const executor = withPolicy(inner, o.policy);
-        const fns = buildUpstreamFns(tools, callTool);
-        server.registerTool("code", { description, inputSchema: { code: z.string() } }, async ({ code }) => {
+        server.registerTool("code", { description, inputSchema: { code: z.string() } }, async ({ code }, extra) => {
             try {
+                const fns = buildUpstreamFns(tools, callTool, extra.signal);
                 const r = await executor.execute(code, [{ name: "codemode", fns }]);
                 if (r.error)
                     return formatMcpResponse(`Error: ${r.error}`, MAX_RESPONSE_CHARS, true);

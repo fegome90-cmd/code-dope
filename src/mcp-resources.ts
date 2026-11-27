@@ -89,11 +89,15 @@ export function unwrapMcpResult(result: CallToolResult): unknown {
   return result;
 }
 
-export function buildUpstreamFns(tools: ToolEntry[], callTool: McpResources["callTool"]): Record<string, (args: unknown) => Promise<unknown>> {
+export function buildUpstreamFns(
+  tools: ToolEntry[],
+  callTool: McpResources["callTool"],
+  signal?: AbortSignal,
+): Record<string, (args: unknown) => Promise<unknown>> {
   // Keep original names for policy matching; the executor resolves aliases.
   return Object.fromEntries(tools.map(({ name }) => [
     name,
-    async (args: unknown) => unwrapMcpResult(await callTool({ name, arguments: (args ?? {}) as Record<string, unknown> })),
+    async (args: unknown) => unwrapMcpResult(await callTool({ name, arguments: (args ?? {}) as Record<string, unknown> }, signal ? { signal } : undefined)),
   ]));
 }
 

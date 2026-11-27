@@ -147,7 +147,7 @@ export declare function connectMcpResources(o: Options): Promise<{
 }>;
 /** Keeps the Cloudflare compatibility result first, followed by standard MCP representations. */
 export declare function unwrapMcpResult(result: CallToolResult): unknown;
-export declare function buildUpstreamFns(tools: ToolEntry[], callTool: McpResources["callTool"]): Record<string, (args: unknown) => Promise<unknown>>;
+export declare function buildUpstreamFns(tools: ToolEntry[], callTool: McpResources["callTool"], signal?: AbortSignal): Record<string, (args: unknown) => Promise<unknown>>;
 export declare function formatMcpResponse(text: string, maxChars: number, isError?: boolean): {
     isError?: boolean | undefined;
     content: {
