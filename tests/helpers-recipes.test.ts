@@ -45,6 +45,59 @@ test("recipes reject non-identifier tool names (no code injection through params
   assert.doesNotThrow(() => paginatedFilter.build({ listTool: "ok", where: { status: "'); evil(); ('" } }));
 });
 
+test("recipe builders reject invalid runtime parameters", async (t) => {
+  const page = { listTool: "list" };
+  const fan = { listTool: "list", idField: "id", detailTool: "detail", detailArg: "key" };
+  const bulk = { findTool: "list", idField: "id", updateTool: "set", idArg: "id", patch: {} };
+  type RuntimePatch = Record<string, unknown>;
+  const cases: ReadonlyArray<{
+    name: string;
+    build: (patch: RuntimePatch) => string;
+    fields: ReadonlyArray<readonly [string, readonly unknown[]]>;
+  }> = [
+    {
+      name: "pagination",
+      build: (patch) => paginatedFilter.build({ ...page, ...patch }),
+      fields: [
+        ["maxPages", [0]], ["sample", [-1]], ["cursorArg", [""]],
+        ["where", [[]]], ["fields", [[123]]],
+        ["baseArgs", [null]], ["nextField", [""]], ["itemsField", [123]], ["groupBy", [null]],
+      ],
+    },
+    {
+      name: "fan-out",
+      build: (patch) => fanOutEnrich.build({ ...fan, ...patch }),
+      fields: [
+        ["limit", [-1]], ["concurrency", [0]], ["detailArg", [""]],
+        ["listArgs", ["bad"]], ["fields", [[""]]],
+        ["idField", [false]], ["itemsField", [""]],
+      ],
+    },
+    {
+      name: "bulk update",
+      build: (patch) => guardedBulkUpdate.build({ ...bulk, ...patch }),
+      fields: [
+        ["maxWrites", ["unlimited", 0, -1, 1.5, null]], ["patch", [null, [], new Date(0)]],
+        ["idField", [""]], ["idArg", [""]], ["findArgs", [[]]], ["dryRun", ["false"]],
+        ["itemsField", [null]],
+      ],
+    },
+  ];
+  for (const { name, build, fields } of cases) {
+    for (const [field, values] of fields) {
+      for (const value of values) {
+        await t.test(`${name}: rejects invalid ${field} (${JSON.stringify(value)})`, () => {
+          assert.throws(() => build({ [field]: value }), { message: new RegExp(`^${field} must be`) });
+        });
+      }
+    }
+  }
+});
+
+test("pagination preserves a zero sample size", () => {
+  assert.match(paginatedFilter.build({ listTool: "list", sample: 0 }), /sample: 0/);
+});
+
 test("fanOutEnrich and guardedBulkUpdate on in-process tools", async () => {
   const written: unknown[] = [];
   const runner = createCodeRunner({

@@ -11,6 +11,42 @@ function ident(name, label) {
     return name;
 }
 const J = (v) => JSON.stringify(v);
+function intWithMin(value, fallback, min, label) {
+    const n = value === undefined ? fallback : value;
+    if (typeof n !== "number" || !Number.isSafeInteger(n) || n < min) {
+        throw new Error(`${label} must be a safe integer >= ${min}`);
+    }
+    return n;
+}
+function nonEmptyString(value, label) {
+    if (typeof value !== "string" || value.length === 0)
+        throw new Error(`${label} must be a nonempty string`);
+    return value;
+}
+function optionalNonEmptyString(value, label) {
+    return value === undefined ? undefined : nonEmptyString(value, label);
+}
+function plainObject(value, label) {
+    if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+        const proto = Object.getPrototypeOf(value);
+        if (proto === Object.prototype || proto === null)
+            return value;
+    }
+    throw new Error(`${label} must be a plain object`);
+}
+function optionalPlainObject(value, label) {
+    return value === undefined ? undefined : plainObject(value, label);
+}
+function optionalStringArray(value, label) {
+    if (value === undefined)
+        return undefined;
+    if (!Array.isArray(value))
+        throw new Error(`${label} must be an array of nonempty strings`);
+    const result = [];
+    for (let i = 0; i < value.length; i++)
+        result.push(nonEmptyString(value[i], label));
+    return result;
+}
 /** List everything across pages, filter, project fields, return a compact summary. */
 export const paginatedFilter = {
     id: "paginated-filter",
@@ -18,18 +54,27 @@ export const paginatedFilter = {
     build(p) {
         const ns = ident(p.namespace ?? "codemode", "namespace");
         const tool = ident(p.listTool, "listTool");
+        const maxPages = intWithMin(p.maxPages, 20, 1, "maxPages");
+        const sample = intWithMin(p.sample, 5, 0, "sample");
+        const baseArgs = optionalPlainObject(p.baseArgs, "baseArgs");
+        const where = optionalPlainObject(p.where, "where");
+        const cursorArg = optionalNonEmptyString(p.cursorArg, "cursorArg");
+        const itemsField = optionalNonEmptyString(p.itemsField, "itemsField");
+        const nextField = optionalNonEmptyString(p.nextField, "nextField");
+        const group = optionalNonEmptyString(p.groupBy, "groupBy");
+        const fields = optionalStringArray(p.fields, "fields");
         return `async () => {
   const ev = helpers.evidence();
   const all = await helpers.paginate(
-    (cursor) => ${ns}.${tool}({ ...${J(p.baseArgs ?? {})}, ...(cursor == null ? {} : { [${J(p.cursorArg ?? "cursor")}]: cursor }) }),
-    { items: ${J(p.itemsField ?? "items")}, next: ${J(p.nextField ?? "next")}, maxPages: ${J(p.maxPages ?? 20)} });
+    (cursor) => ${ns}.${tool}({ ...${J(baseArgs ?? {})}, ...(cursor == null ? {} : { [${J(cursorArg ?? "cursor")}]: cursor }) }),
+    { items: ${J(itemsField ?? "items")}, next: ${J(nextField ?? "next")}, maxPages: ${J(maxPages)} });
   ev.step("paginate", { pages: all.pages, items: all.items.length, truncated: all.truncated });
-  const filtered = helpers.where(all.items, ${J(p.where ?? {})});
+  const filtered = helpers.where(all.items, ${J(where ?? {})});
   ev.step("filter", { kept: filtered.length });
-  const fields = ${J(p.fields ?? null)};
+  const fields = ${J(fields ?? null)};
   const projected = fields ? helpers.pick(filtered, fields) : filtered;
-  const groupBy = ${J(p.groupBy ?? null)};
-  return helpers.result(helpers.summarize(projected, { sample: ${J(p.sample ?? 5)} }), { ok: !all.truncated,
+  const groupBy = ${J(group ?? null)};
+  return helpers.result(helpers.summarize(projected, { sample: ${J(sample)} }), { ok: !all.truncated,
     groups: groupBy ? helpers.countBy(filtered, groupBy) : undefined,
     truncated: all.truncated, evidence: ev.steps });
 }`;
@@ -43,16 +88,23 @@ export const fanOutEnrich = {
         const ns = ident(p.namespace ?? "codemode", "namespace");
         const list = ident(p.listTool, "listTool");
         const detail = ident(p.detailTool, "detailTool");
+        const limit = intWithMin(p.limit, 50, 1, "limit");
+        const concurrency = intWithMin(p.concurrency, 4, 1, "concurrency");
+        const idField = nonEmptyString(p.idField, "idField");
+        const detailArg = nonEmptyString(p.detailArg, "detailArg");
+        const listArgs = optionalPlainObject(p.listArgs, "listArgs");
+        const itemsField = optionalNonEmptyString(p.itemsField, "itemsField");
+        const fields = optionalStringArray(p.fields, "fields");
         return `async () => {
   const ev = helpers.evidence();
-  const listed = await ${ns}.${list}(${J(p.listArgs ?? {})});
-  const items = (Array.isArray(listed) ? listed : (listed && listed[${J(p.itemsField ?? "items")}]) || []).slice(0, ${J(p.limit ?? 50)});
+  const listed = await ${ns}.${list}(${J(listArgs ?? {})});
+  const items = (Array.isArray(listed) ? listed : (listed && listed[${J(itemsField ?? "items")}]) || []).slice(0, ${J(limit)});
   ev.step("list", { count: items.length });
-  const ids = items.map((it) => it[${J(p.idField)}]);
-  const results = await helpers.parallel(ids.map((id) => () => ${ns}.${detail}({ [${J(p.detailArg)}]: id })), { concurrency: ${J(p.concurrency ?? 4)} });
+  const ids = items.map((it) => it[${J(idField)}]);
+  const results = await helpers.parallel(ids.map((id) => () => ${ns}.${detail}({ [${J(detailArg)}]: id })), { concurrency: ${J(concurrency)} });
   const { values, errors, complete } = helpers.settle(results);
   ev.step("details", { ok: values.length, failed: errors.length });
-  const fields = ${J(p.fields ?? null)};
+  const fields = ${J(fields ?? null)};
   return helpers.result(fields ? helpers.pick(values, fields) : values, {
     ok: complete, errors: errors.map((e) => ({ id: ids[e.index], error: e.error })), evidence: ev.steps });
 }`;
@@ -66,22 +118,29 @@ export const guardedBulkUpdate = {
         const ns = ident(p.namespace ?? "codemode", "namespace");
         const find = ident(p.findTool, "findTool");
         const update = ident(p.updateTool, "updateTool");
-        if (Object.hasOwn(p.patch, p.idArg))
-            throw new Error(`patch must not contain the id argument "${p.idArg}"`);
-        if (p.dryRun !== undefined && typeof p.dryRun !== "boolean")
+        const maxWrites = intWithMin(p.maxWrites, 20, 1, "maxWrites");
+        const patch = plainObject(p.patch, "patch");
+        const idField = nonEmptyString(p.idField, "idField");
+        const idArg = nonEmptyString(p.idArg, "idArg");
+        const findArgs = optionalPlainObject(p.findArgs, "findArgs");
+        const itemsField = optionalNonEmptyString(p.itemsField, "itemsField");
+        const dryRun = p.dryRun;
+        if (dryRun !== undefined && typeof dryRun !== "boolean")
             throw new Error("dryRun must be a boolean");
+        if (Object.hasOwn(patch, idArg))
+            throw new Error(`patch must not contain the id argument "${idArg}"`);
         return `async () => {
   const ev = helpers.evidence();
-  const found = await ${ns}.${find}(${J(p.findArgs ?? {})});
-  const targets = (Array.isArray(found) ? found : (found && found[${J(p.itemsField ?? "items")}]) || []).map((t) => t[${J(p.idField)}]);
+  const found = await ${ns}.${find}(${J(findArgs ?? {})});
+  const targets = (Array.isArray(found) ? found : (found && found[${J(itemsField ?? "items")}]) || []).map((t) => t[${J(idField)}]);
   ev.step("find", { targets: targets.length });
-  const maxWrites = ${J(p.maxWrites ?? 20)};
+  const maxWrites = ${J(maxWrites)};
   if (targets.length > maxWrites) return helpers.result({ targets }, { ok: false, reason: "too many targets (" + targets.length + " > " + maxWrites + ")", evidence: ev.steps });
-  if (${J(p.dryRun ?? true)}) return helpers.result({ wouldUpdate: targets, patch: ${J(p.patch)} }, { dryRun: true, evidence: ev.steps });
+  if (${J(dryRun ?? true)}) return helpers.result({ wouldUpdate: targets, patch: ${J(patch)} }, { dryRun: true, evidence: ev.steps });
   const applied = [];
   for (const id of targets) {
     try {
-      await ${ns}.${update}({ ...${J(p.patch)}, [${J(p.idArg)}]: id });
+      await ${ns}.${update}({ ...${J(patch)}, [${J(idArg)}]: id });
       applied.push(id);
     } catch (e) {
       const error = String(e.message || e);
