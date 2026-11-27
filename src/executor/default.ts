@@ -1,4 +1,4 @@
-import type { Executor } from "@cloudflare/codemode";
+import type { Executor } from "../types.ts";
 import { QuickJSExecutor } from "./quickjs-executor.ts";
 import { WorkerExecutor, type WorkerExecutorOptions } from "./worker-executor.ts";
 import { PooledWorkerExecutor, type PooledWorkerExecutorOptions } from "./pool-executor.ts";

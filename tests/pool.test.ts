@@ -6,12 +6,15 @@ import { fileURLToPath } from "node:url";
 import { PooledWorkerExecutor } from "../src/index.ts";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-async function waitForReady(pool: PooledWorkerExecutor) {
+async function until(condition: () => boolean, message = "pool condition did not settle") {
   const deadline = Date.now() + 3_000;
-  while (pool.stats.warming > 0) {
-    assert.ok(Date.now() < deadline, "pool workers did not finish warming");
+  while (!condition()) {
+    assert.ok(Date.now() < deadline, message);
     await sleep(10);
   }
+}
+function waitForReady(pool: PooledWorkerExecutor) {
+  return until(() => pool.stats.warming === 0, "pool workers did not finish warming");
 }
 
 test("pool: warming tracks preloaded workers and close does not replace them", async () => {
@@ -37,8 +40,7 @@ test("pool: an error restores prewarmed capacity without another execute", async
     await waitForReady(pool);
     const before = pool.stats.spawned;
     assert.match((await pool.execute("async () => { throw new Error('recycle'); }", {})).error ?? "", /recycle/);
-    assert.equal(pool.stats.alive, 2);
-    assert.equal(pool.stats.spawned, before + 1);
+    await until(() => pool.stats.spawned === before + 1 && pool.stats.alive === 2);
     await waitForReady(pool);
     assert.equal(pool.stats.alive, 2);
     assert.equal(pool.stats.warming, 0);
@@ -54,8 +56,7 @@ test("pool: maxUses replaces a prewarmed worker before the next execute", async 
     assert.equal((await pool.execute("async () => 1", {})).result, 1);
     assert.equal(pool.stats.spawned, 1);
     assert.equal((await pool.execute("async () => 2", {})).result, 2);
-    assert.equal(pool.stats.alive, 1);
-    assert.equal(pool.stats.spawned, 2);
+    await until(() => pool.stats.spawned === 2 && pool.stats.alive === 1);
     await waitForReady(pool);
     assert.equal(pool.stats.warming, 0);
     assert.equal(pool.stats.spawned, 2);

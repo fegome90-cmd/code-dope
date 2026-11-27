@@ -46,6 +46,14 @@
     "@modelcontextprotocol/sdk": "^1.25.0",
     "zod": "^4.0.0"
   },
+  "peerDependenciesMeta": {
+    "@modelcontextprotocol/sdk": {
+      "optional": true
+    },
+    "zod": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@biomejs/biome": "2.6.8",
     "@modelcontextprotocol/sdk": "1.32.2",

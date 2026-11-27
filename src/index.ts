@@ -17,5 +17,11 @@ export { SANDBOX_HELPERS, HELPERS_DOC } from "./helpers.ts";
 export { RECIPES, paginatedFilter, fanOutEnrich, guardedBulkUpdate, type Recipe } from "./recipes.ts";
 export { createCodeRunner, type CodeRunner, type CodeRunnerOptions } from "./runner.ts";
 export { normalizeCode } from "./vendor/cf-normalize.ts";
-export type { Executor, ExecuteResult, ResolvedProvider } from "@cloudflare/codemode";
-export { searchTools, typesFor, type ToolEntry } from "./discovery.ts";
+export type {
+  Executor,
+  ExecuteResult,
+  ExecuteOptions,
+  ResolvedProvider,
+  ConnectorBinding,
+} from "./types.ts";
+export { searchTools, typesFor, type ToolEntry } from "./discovery-core.ts";

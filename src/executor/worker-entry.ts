@@ -4,14 +4,16 @@
  *  - mode "once": run the job in workerData, post "done", the parent terminates us.
  *  - mode "pool": warm up the WASM module, post "ready", then run jobs received
  *    by message, one at a time. Every job gets a fresh QuickJS runtime/context.
+ *    When retired cleanly, close the parent port and let the worker exit.
  */
 import { parentPort, workerData } from "node:worker_threads";
-import type { ExecuteResult } from "@cloudflare/codemode";
+import type { ExecuteResult } from "../types.ts";
 import { QuickJSExecutor, type QuickJSExecutorOptions } from "./quickjs-executor.ts";
 import type { ProviderSpec, ReplyMsg } from "./worker-bridge.ts";
 
 interface Init { mode: "once" | "pool"; options: QuickJSExecutorOptions; code?: string; providers?: ProviderSpec[] }
 interface JobMsg { type: "job"; job: number; code: string; providers: ProviderSpec[] }
+interface ShutdownMsg { type: "shutdown" }
 
 const init = workerData as Init;
 if (init.mode === "pool") {
@@ -51,7 +53,11 @@ async function run(job: number, code: string, specs: ProviderSpec[]): Promise<Ex
   }
 }
 
-port.on("message", (m: ReplyMsg | JobMsg) => {
+port.on("message", (m: ReplyMsg | JobMsg | ShutdownMsg) => {
+  if (m.type === "shutdown") {
+    port.close();
+    return;
+  }
   if (m.type === "job") {
     void run(m.job, m.code, m.providers).then((result) => port.postMessage({ type: "done", job: m.job, result }));
     return;

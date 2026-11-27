@@ -1,4 +1,4 @@
-import type { ExecuteOptions, ExecuteResult, Executor, ResolvedProvider } from "@cloudflare/codemode";
+import type { ExecuteOptions, ExecuteResult, Executor, ResolvedProvider } from "../types.ts";
 import type { QuickJSExecutorOptions } from "./quickjs-executor.ts";
 import { type Fns } from "./worker-bridge.ts";
 export interface WorkerExecutorOptions extends QuickJSExecutorOptions {

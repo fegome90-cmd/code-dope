@@ -13,7 +13,7 @@ Biblioteca TypeScript/ESM experimental para Code Mode en Node. El paquete sigue 
 
 - Lee [la hoja de ruta](docs/roadmap.md), [CLAUDE.md](CLAUDE.md) y el último handoff antes de modificar contratos. No declares implementado lo propuesto ni estabilices una API sin consumidores.
 - El flujo reproducible es npm con `package-lock.json`: `npm ci && npm run test:all`. CI usa la línea Node de `.node-version` y npm fijado en `packageManager`. No mantener un segundo lockfile o un segundo flujo de bootstrap.
-- En cambios de comportamiento prueba positivos, negativos y fallos parciales. No aceptar comparaciones de dos resultados vacíos salvo que sea el resultado esperado y se afirme. No debilitar los tres archivos protegidos de CLAUDE.md ni editar `src/vendor/`.
+- En cambios de comportamiento prueba positivos, negativos y fallos parciales. No aceptar comparaciones de dos resultados vacíos salvo que sea el resultado esperado y se afirme. No debilitar los tres archivos protegidos de CLAUDE.md ni editar `src/vendor/` salvo parches acotados de seguridad o estabilidad documentados en la cabecera del archivo y en [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 - Después de cambiar `src/`, reconstruye y agrega `dist/` al mismo commit. `check:dist` compara contra el índice y rechaza archivos generados no versionados, incluso si una regla de ignore los ocultaría.
 - Sigue [CONTRIBUTING.md](CONTRIBUTING.md) para ramas, revisiones y merge. Evidencia verde no autoriza merge, publicación, despliegue ni cambios de permisos. No reutilices excepciones de otros repositorios.
 - Aplica [SECURITY.md](SECURITY.md). Sin secretos ni datos reales en fixtures. Temporales sólo en scratchpad o `mkdtemp(os.tmpdir())`.

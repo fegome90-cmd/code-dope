@@ -7,4 +7,4 @@ export { SANDBOX_HELPERS, HELPERS_DOC } from "./helpers.js";
 export { RECIPES, paginatedFilter, fanOutEnrich, guardedBulkUpdate } from "./recipes.js";
 export { createCodeRunner } from "./runner.js";
 export { normalizeCode } from "./vendor/cf-normalize.js";
-export { searchTools, typesFor } from "./discovery.js";
+export { searchTools, typesFor } from "./discovery-core.js";

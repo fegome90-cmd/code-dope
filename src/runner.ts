@@ -2,7 +2,7 @@
  * createCodeRunner: the one-call entry point for plugins and other in-process
  * consumers that already have tool functions (no MCP needed).
  */
-import type { ExecuteResult, ResolvedProvider } from "@cloudflare/codemode";
+import type { ExecuteResult, ResolvedProvider } from "./types.ts";
 import { createDefaultExecutor, type Isolation } from "./executor/default.ts";
 import type { PooledWorkerExecutorOptions } from "./executor/pool-executor.ts";
 import { createAuditLog, withPolicy, type AuditRecord, type ToolPolicy } from "./policy.ts";
@@ -25,6 +25,15 @@ export interface CodeRunResult extends ExecuteResult {
 
 export interface CodeRunner {
   run(code: string): Promise<CodeRunResult>;
+  /**
+   * Closes this runner permanently and disposes its internally owned executor if supported.
+   *
+   * Idempotent: concurrent or repeated calls return the same promise. Sets terminal state
+   * synchronously so subsequent `run()` calls fail closed with `"CodeRunner is closed"`.
+   * Under `isolation: "pool"`, terminates active/queued workers and awaits cleanup; under
+   * `"worker"` or `"inline"`, resolves immediately without cancelling in-flight runs.
+   */
+  close(): Promise<void>;
 }
 
 export function createCodeRunner(o: CodeRunnerOptions): CodeRunner {
@@ -33,20 +42,39 @@ export function createCodeRunner(o: CodeRunnerOptions): CodeRunner {
     name,
     fns: Object.fromEntries(Object.entries(fns).map(([k, f]) => [k, async (a: unknown) => f(a)])),
   }));
+  let closed = false;
+  let closing: Promise<void> | undefined;
   return {
     async run(code) {
+      if (closed) {
+        return { result: undefined, error: "CodeRunner is closed", logs: [], audit: [], durationMs: 0 };
+      }
       const log = createAuditLog();
       const userAudit = o.policy.audit;
       const guarded = withPolicy(executor, {
         ...o.policy,
         audit: (r) => {
           log.sink(r);
-          userAudit?.(r);
+          if (userAudit) {
+            try {
+              void Promise.resolve(userAudit(r)).catch(() => {});
+            } catch {
+              /* sink-owned delivery failure */
+            }
+          }
         },
       });
       const t = Date.now();
       const r = await guarded.execute(code, providers);
       return { ...r, audit: log.records, durationMs: Date.now() - t };
+    },
+    close() {
+      if (closing) return closing;
+      closed = true;
+      closing = "close" in executor && typeof executor.close === "function"
+        ? Promise.resolve((executor as { close: () => Promise<void> }).close())
+        : Promise.resolve();
+      return closing;
     },
   };
 }

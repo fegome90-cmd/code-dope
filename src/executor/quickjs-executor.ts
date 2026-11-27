@@ -35,7 +35,7 @@ import type {
   ExecuteResult,
   Executor,
   ResolvedProvider,
-} from "@cloudflare/codemode";
+} from "../types.ts";
 import { normalizeCode } from "../vendor/cf-normalize.ts";
 import { sanitizeToolName } from "../vendor/cf-utils.ts";
 
@@ -74,7 +74,96 @@ export interface QuickJSExecutorOptions {
 }
 
 const IDENT = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
-const RESERVED = new Set(["__cd_host", "__cd_log", "console", "globalThis", "helpers"]);
+const RESERVED = new Set([
+  // Bridge/wrapper internals and JS keywords matching IDENT
+  "__cd_host",
+  "__cd_log",
+  "__r",
+  "console",
+  "globalThis",
+  "helpers",
+  "arguments",
+  "await",
+  "async",
+  "yield",
+  "eval",
+  // Prototype-mutating and inherited Object.prototype keys
+  "__proto__",
+  "constructor",
+  "toString",
+  "valueOf",
+  "hasOwnProperty",
+  "isPrototypeOf",
+  "propertyIsEnumerable",
+  "toLocaleString",
+  // Core ECMAScript globals
+  "JSON",
+  "Object",
+  "Proxy",
+  "Promise",
+  "Error",
+  "AggregateError",
+  "EvalError",
+  "RangeError",
+  "ReferenceError",
+  "SyntaxError",
+  "TypeError",
+  "URIError",
+  "Array",
+  "ArrayBuffer",
+  "SharedArrayBuffer",
+  "DataView",
+  "Int8Array",
+  "Uint8Array",
+  "Uint8ClampedArray",
+  "Int16Array",
+  "Uint16Array",
+  "Int32Array",
+  "Uint32Array",
+  "Float32Array",
+  "Float64Array",
+  "BigInt64Array",
+  "BigUint64Array",
+  "Boolean",
+  "Date",
+  "Function",
+  "Map",
+  "Set",
+  "WeakMap",
+  "WeakSet",
+  "WeakRef",
+  "FinalizationRegistry",
+  "Math",
+  "Number",
+  "BigInt",
+  "RegExp",
+  "Reflect",
+  "String",
+  "Symbol",
+  "Intl",
+  "Atomics",
+  "Infinity",
+  "NaN",
+  "undefined",
+  "isFinite",
+  "isNaN",
+  "parseFloat",
+  "parseInt",
+  "decodeURI",
+  "decodeURIComponent",
+  "encodeURI",
+  "encodeURIComponent",
+]);
+
+const FALLBACK_OOM_JSON = '{"ok":false,"error":"Tool result exceeded sandbox memory limit"}';
+
+function allocString(vm: QuickJSContext, str: string): QuickJSHandle {
+  const h = vm.newString(str);
+  if (vm.typeof(h) === "string") return h;
+  // QTS_NewString returns JS_EXCEPTION on QuickJS memoryLimitBytes OOM without throwing in JS.
+  h.dispose();
+  throw new Error("out of memory");
+}
 
 type Fns = Record<string, (...args: unknown[]) => Promise<unknown>>;
 
@@ -127,6 +216,13 @@ export class QuickJSExecutor implements Executor {
     let disposed = false;
     const pending = new Set<QuickJSDeferredPromise>();
     let timer: NodeJS.Timeout | undefined;
+    let abortExec!: (err: unknown) => void;
+    const aborted = new Promise<{ abortError: string }>((res) => {
+      abortExec = (e) => {
+        disposed = true;
+        res({ abortError: errMsg(e) });
+      };
+    });
 
     const pump = () => {
       if (disposed) return;
@@ -134,6 +230,7 @@ export class QuickJSExecutor implements Executor {
       if (r.error) r.error.dispose();
     };
 
+    let stringifyHandle: QuickJSHandle | undefined;
     try {
       // console bridge: strings only, capped.
       const logFn = vm.newFunction("__cd_log", (levelH, msgH) => {
@@ -169,27 +266,79 @@ export class QuickJSExecutor implements Executor {
         const argsJson = vm.getString(argsH);
         const deferred = vm.newPromise();
         if (pending.size >= this.#o.maxPendingCalls) {
-          const h = vm.newString(JSON.stringify({ ok: false, error: `Too many concurrent tool calls (limit ${this.#o.maxPendingCalls}); use helpers.parallel with a concurrency limit` }));
-          deferred.resolve(h);
-          h.dispose();
+          let h: QuickJSHandle | undefined;
+          try {
+            h = allocString(
+              vm,
+              JSON.stringify({
+                ok: false,
+                error: `Too many concurrent tool calls (limit ${this.#o.maxPendingCalls}); use helpers.parallel with a concurrency limit`,
+              }),
+            );
+            deferred.resolve(h);
+          } catch (err) {
+            try { deferred.dispose(); } catch { poisoned = true; }
+            abortExec(err);
+            return vm.undefined;
+          } finally {
+            h?.dispose();
+          }
           const handle = deferred.handle;
-          queueMicrotask(pump);
+          queueMicrotask(() => {
+            try {
+              pump();
+            } catch (e) {
+              if (!disposed) abortExec(e);
+            }
+          });
           return handle;
         }
         pending.add(deferred);
         const settle = (envelope: unknown) => {
           if (disposed) return;
-          pending.delete(deferred);
           let text: string;
           try {
             text = JSON.stringify(envelope) ?? '{"ok":true}';
           } catch (e) {
             text = JSON.stringify({ ok: false, error: `Tool result is not JSON-serializable: ${errMsg(e)}` });
           }
-          const h = vm.newString(text);
-          deferred.resolve(h);
-          h.dispose();
-          pump();
+          let resolvedOk = false;
+          let lastErr: unknown;
+          let h: QuickJSHandle | undefined;
+          try {
+            h = allocString(vm, text);
+            deferred.resolve(h);
+            resolvedOk = true;
+            pending.delete(deferred);
+          } catch (err) {
+            lastErr = err;
+          } finally {
+            h?.dispose();
+          }
+          if (!resolvedOk) {
+            let fh: QuickJSHandle | undefined;
+            try {
+              fh = allocString(vm, FALLBACK_OOM_JSON);
+              deferred.resolve(fh);
+              resolvedOk = true;
+              pending.delete(deferred);
+            } catch (fallbackErr) {
+              lastErr = fallbackErr;
+            } finally {
+              fh?.dispose();
+            }
+          }
+          if (!resolvedOk) {
+            pending.delete(deferred);
+            try { deferred.dispose(); } catch { poisoned = true; }
+            abortExec(lastErr);
+            return;
+          }
+          try {
+            pump();
+          } catch (pumpErr) {
+            if (!disposed) abortExec(pumpErr);
+          }
         };
         (async () => {
           const fns = byName.get(prov);
@@ -199,50 +348,78 @@ export class QuickJSExecutor implements Executor {
           }
           const args = argsJson === "" ? undefined : JSON.parse(argsJson);
           return fns[key](args);
-        })().then(
-          (value) => settle({ ok: true, value: value === undefined ? null : value }),
-          (e) => settle({ ok: false, error: errMsg(e) }),
-        );
+        })()
+          .then(
+            (value) => settle({ ok: true, value: value === undefined ? null : value }),
+            (e) => settle({ ok: false, error: errMsg(e) }),
+          )
+          .catch((e) => {
+            if (!disposed) abortExec(e);
+          });
         return deferred.handle;
       });
       vm.setProp(vm.global, "__cd_host", hostFn);
       hostFn.dispose();
 
       const setup = `(() => {
-  const host = globalThis.__cd_host, log = globalThis.__cd_log;
-  delete globalThis.__cd_host; delete globalThis.__cd_log;
-  const fmt = (a) => a.map((x) => typeof x === "string" ? x : (() => { try { return JSON.stringify(x); } catch { return String(x); } })()).join(" ");
-  globalThis.console = { log: (...a) => log("log", fmt(a)), info: (...a) => log("info", fmt(a)), warn: (...a) => log("warn", fmt(a)), error: (...a) => log("error", fmt(a)) };
+  const globalObj = globalThis;
+  const hasOwn = Object.hasOwn;
+  const reflectHas = Reflect.has;
+  const apply = Reflect.apply;
+  const stringify = JSON.stringify;
+  const parse = JSON.parse;
+  const Err = Error;
+  const MakeProxy = Proxy;
+  const Str = String;
+  const arrMap = Array.prototype.map;
+  const arrJoin = Array.prototype.join;
+  const host = globalObj.__cd_host, log = globalObj.__cd_log;
+  delete globalObj.__cd_host; delete globalObj.__cd_log;
+  const fmt = (a) => apply(arrJoin, apply(arrMap, a, [(x) => typeof x === "string" ? x : (() => { try { return stringify(x); } catch { return Str(x); } })()]), [" "]);
+  globalObj.console = { log: (...a) => log("log", fmt(a)), info: (...a) => log("info", fmt(a)), warn: (...a) => log("warn", fmt(a)), error: (...a) => log("error", fmt(a)) };
   for (const name of ${JSON.stringify(providers.map((p) => p.name))}) {
+    if (reflectHas(globalObj, name)) throw new Err("Invalid provider name: " + name);
     const target = {};
-    globalThis[name] = new Proxy(target, {
+    globalObj[name] = new MakeProxy(target, {
       get(t, key) {
-        if (Object.prototype.hasOwnProperty.call(t, key)) return t[key];
+        if (hasOwn(t, key)) return t[key];
         if (typeof key !== "string" || key === "then") return undefined;
         return async (args) => {
-          const env = JSON.parse(await host(name, key, args === undefined ? "" : JSON.stringify(args)));
-          if (!env.ok) throw new Error(env.error);
+          const env = parse(await host(name, key, args === undefined ? "" : stringify(args)));
+          if (!env.ok) throw new Err(env.error);
           return env.value;
         };
       },
     });
   }
 })();`;
-      const preludes = [setup, ...this.#o.preludes, ...providers.map((p) => p.prelude ?? "").filter(Boolean)];
-      for (const src of preludes) {
+      const evalPrelude = (src: string) => {
         const r = vm.evalCode(src, "prelude.js");
         if (r.error) {
           const err = vm.dump(r.error);
           r.error.dispose();
-          poisoned ||= errMsg(err) === "" || errMsg(err) === "undefined";
-          throw new Error(`Prelude failed: ${errMsg(err)}`);
+          const msg = errMsg(err);
+          poisoned ||= msg === "" || msg === "undefined";
+          if (msg.startsWith("Invalid provider name: ")) throw new Error(msg);
+          throw new Error(`Prelude failed: ${msg}`);
         }
         r.value.dispose();
+      };
+      evalPrelude(setup);
+
+      const jsonHandle = vm.getProp(vm.global, "JSON");
+      try {
+        stringifyHandle = vm.getProp(jsonHandle, "stringify");
+      } finally {
+        jsonHandle.dispose();
+      }
+
+      for (const src of [...this.#o.preludes, ...providers.map((p) => p.prelude ?? "").filter(Boolean)]) {
+        evalPrelude(src);
       }
 
       const normalized = normalizeCode(code);
-      const program = `(async () => { const __r = await (${normalized}
-)(); return __r === undefined ? "__cd_undefined__" : JSON.stringify(__r); })()`;
+      const program = `(async () => await (${normalized}\n)())()`;
       const evaluated = vm.evalCode(program, "user-code.js");
       if (evaluated.error) {
         const err = vm.dump(evaluated.error);
@@ -257,26 +434,58 @@ export class QuickJSExecutor implements Executor {
       const timeout = new Promise<"timeout">((res) => {
         timer = setTimeout(() => res("timeout"), Math.max(0, deadline - Date.now()));
       });
-      const outcome = await Promise.race([resolved, timeout]);
+      const outcome = await Promise.race([resolved, timeout, aborted]);
       if (outcome === "timeout") {
         return { result: undefined, error: `Execution timed out after ${this.#o.timeoutMs}ms`, logs };
       }
+      if ("abortError" in outcome) {
+        return { result: undefined, error: outcome.abortError, logs };
+      }
       if (outcome.error) {
-        const err = vm.dump(outcome.error);
-        outcome.error.dispose();
+        let err: unknown;
+        try {
+          err = vm.dump(outcome.error);
+        } finally {
+          outcome.error.dispose();
+        }
         const msg = errMsg(err);
         return { result: undefined, error: /interrupted/i.test(msg) ? `Execution timed out after ${this.#o.timeoutMs}ms (interrupted)` : msg, logs };
       }
-      const text = vm.getString(outcome.value);
-      outcome.value.dispose();
-      if (text === "__cd_undefined__") return { result: undefined, logs };
-      const result: unknown = JSON.parse(text);
       try {
-        JSON.stringify(result); // downstream hosts will serialize it again
-      } catch {
-        return { result: undefined, error: "Result is too deeply nested to serialize; flatten it before returning", logs };
+        if (vm.typeof(outcome.value) === "undefined") {
+          return { result: undefined, logs };
+        }
+        if (!stringifyHandle) {
+          throw new Error("Missing serializer handle");
+        }
+        const serialized = vm.callFunction(stringifyHandle, vm.undefined, outcome.value);
+        if (serialized.error) {
+          let err: unknown;
+          try {
+            err = vm.dump(serialized.error);
+          } finally {
+            serialized.error.dispose();
+          }
+          return { result: undefined, error: errMsg(err), logs };
+        }
+        try {
+          if (vm.typeof(serialized.value) === "undefined") {
+            return { result: undefined, error: "Result is not JSON-serializable", logs };
+          }
+          const text = vm.getString(serialized.value);
+          const result: unknown = JSON.parse(text);
+          try {
+            JSON.stringify(result); // downstream hosts will serialize it again
+          } catch {
+            return { result: undefined, error: "Result is too deeply nested to serialize; flatten it before returning", logs };
+          }
+          return { result, logs };
+        } finally {
+          serialized.value.dispose();
+        }
+      } finally {
+        outcome.value.dispose();
       }
-      return { result, logs };
     } catch (e) {
       return { result: undefined, error: errMsg(e), logs };
     } finally {
@@ -285,6 +494,7 @@ export class QuickJSExecutor implements Executor {
       for (const d of pending) {
         try { d.dispose(); } catch { poisoned = true; }
       }
+      try { stringifyHandle?.dispose(); } catch { poisoned = true; }
       try { vm.dispose(); } catch { poisoned = true; }
       try { runtime.dispose(); } catch { poisoned = true; }
       if (poisoned) discardModule(QuickJS);

@@ -1,4 +1,4 @@
-import type { Executor } from "@cloudflare/codemode";
+import type { Executor } from "../types.ts";
 import { PooledWorkerExecutor, type PooledWorkerExecutorOptions } from "./pool-executor.ts";
 export type Isolation = "worker" | "pool" | "inline";
 /**

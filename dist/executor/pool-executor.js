@@ -29,7 +29,7 @@ export class PooledWorkerExecutor {
     #slots = new Set();
     #idle = [];
     #queue = [];
-    #terminating = new Set();
+    #terminating = new Map();
     #closing;
     #spawned = 0;
     #nextJob = 0;
@@ -48,9 +48,7 @@ export class PooledWorkerExecutor {
         this.#killGraceMs = killGraceMs;
         this.#timeoutMs = quickjs.timeoutMs ?? 30_000;
         this.#quickjs = { ...quickjs, timeoutMs: this.#timeoutMs };
-        if (prewarm)
-            for (let i = 0; i < size; i++)
-                this.#park(this.#spawn());
+        this.#tryRefill(true);
     }
     get stats() {
         let warming = 0;
@@ -73,10 +71,11 @@ export class PooledWorkerExecutor {
         this.#closed = true;
         for (const w of this.#queue.splice(0))
             w(null);
-        const destroying = [...this.#slots].map((s) => this.#destroy(s, "Executor pool closed"));
-        // Recycled slots leave #slots before their native threads have terminated.
-        // Every caller of close must wait for those terminations as well.
-        this.#closing = Promise.allSettled([...destroying, ...this.#terminating]).then((results) => {
+        for (const slot of this.#slots)
+            void this.#destroy(slot, "Executor pool closed", true);
+        // Wait for both new and already-running terminations, including unref'ed idle retirements.
+        this.#refTerminating();
+        this.#closing = Promise.allSettled(this.#terminating.values()).then((results) => {
             const failed = results.find((r) => r.status === "rejected");
             if (failed?.status === "rejected")
                 throw failed.reason;
@@ -93,7 +92,7 @@ export class PooledWorkerExecutor {
         });
         this.#spawned++;
         let markReady;
-        const slot = { worker, uses: 0, isReady: false, ready: new Promise((r) => (markReady = r)), dead: false };
+        const slot = { worker, uses: 0, isReady: false, ready: new Promise((r) => (markReady = r)), dead: false, exited: false };
         this.#slots.add(slot);
         worker.on("message", (m) => {
             if (slot.dead)
@@ -114,7 +113,10 @@ export class PooledWorkerExecutor {
             void this.#destroy(slot, reason);
         };
         worker.on("error", (e) => dead(`Sandbox worker failed: ${e.message}`));
-        worker.on("exit", (c) => dead(`Sandbox worker exited (code ${c})`));
+        worker.on("exit", (c) => {
+            slot.exited = true;
+            dead(`Sandbox worker exited (code ${c})`);
+        });
         return slot;
     }
     #acquire() {
@@ -125,8 +127,9 @@ export class PooledWorkerExecutor {
         const idle = this.#idle.splice(ready < 0 ? 0 : ready, 1)[0];
         if (idle)
             return Promise.resolve(this.#take(idle));
-        if (this.#slots.size < this.#size)
+        if (this.#hasCapacity())
             return Promise.resolve(this.#take(this.#spawn()));
+        this.#refTerminating();
         return new Promise((resolve) => this.#queue.push(resolve));
     }
     #take(slot) {
@@ -137,20 +140,32 @@ export class PooledWorkerExecutor {
     /** Hands a healthy slot to the next queued execution, or parks it as idle. */
     #park(slot) {
         if (slot.dead)
-            return this.#refill();
+            return this.#tryRefill(false);
         const next = this.#queue.shift();
         if (next)
             return next(this.#take(slot));
         slot.worker.unref();
         this.#idle.push(slot);
         if (this.#idleMs > 0) {
-            slot.idleTimer = setTimeout(() => void this.#destroy(slot, "idle"), this.#idleMs);
+            slot.idleTimer = setTimeout(() => void this.#destroy(slot, "idle", true), this.#idleMs);
             slot.idleTimer.unref();
         }
     }
-    /** Capacity was freed by a dead worker: serve the queue with a fresh one. */
-    #refill() {
-        if (!this.#closed && this.#queue.length && this.#slots.size < this.#size)
+    #hasCapacity() {
+        return !this.#closed && this.#slots.size + this.#terminating.size < this.#size;
+    }
+    #refTerminating() {
+        for (const slot of this.#terminating.keys())
+            if (!slot.exited)
+                slot.worker.ref();
+    }
+    /** Serve demand first; idle reaping and failed warm-up do not trigger prewarming. */
+    #tryRefill(allowPrewarm) {
+        while (this.#queue.length && this.#hasCapacity()) {
+            const slot = this.#take(this.#spawn());
+            this.#queue.shift()(slot);
+        }
+        while (allowPrewarm && this.#prewarm && !this.#queue.length && this.#hasCapacity())
             this.#park(this.#spawn());
     }
     #forget(slot) {
@@ -160,27 +175,57 @@ export class PooledWorkerExecutor {
         if (i >= 0)
             this.#idle.splice(i, 1);
     }
-    async #destroy(slot, reason) {
+    #destroy(slot, reason, cooperative = false) {
         if (slot.dead)
-            return;
+            return Promise.resolve();
         slot.dead = true;
         slot.deathReason = reason;
         this.#forget(slot);
+        const canCooperate = cooperative && slot.isReady && !slot.onMessage && !slot.exited;
+        const allowPrewarm = slot.isReady && reason !== "idle";
+        const terminated = this.#stopWorker(slot, canCooperate, reason === "idle").finally(() => {
+            this.#terminating.delete(slot);
+            this.#tryRefill(allowPrewarm);
+        });
+        this.#terminating.set(slot, terminated);
+        // Background retirement has no caller; close still sees failures in its snapshot.
+        void terminated.catch(() => { });
         slot.onDead?.(reason);
-        const terminated = slot.worker.terminate();
-        this.#terminating.add(terminated);
-        // A failed warm-up is retried only for queued demand. Repeating background
-        // warm-up with the same invalid configuration would create an endless loop.
-        if (!this.#closed && this.#prewarm && slot.isReady && reason !== "idle" && this.#slots.size < this.#size)
-            this.#park(this.#spawn());
-        else
-            this.#refill();
-        try {
-            await terminated;
+        this.#tryRefill(allowPrewarm);
+        return terminated;
+    }
+    async #stopWorker({ worker }, cooperative, idle) {
+        if (!cooperative) {
+            await worker.terminate();
+            return;
         }
-        finally {
-            this.#terminating.delete(terminated);
-        }
+        await new Promise((resolve, reject) => {
+            const onExit = () => {
+                clearTimeout(timer);
+                resolve();
+            };
+            const force = async () => {
+                clearTimeout(timer);
+                worker.off("exit", onExit);
+                try {
+                    await worker.terminate();
+                    resolve();
+                }
+                catch (error) {
+                    reject(error);
+                }
+            };
+            worker.once("exit", onExit);
+            const timer = setTimeout(force, this.#killGraceMs);
+            if (idle)
+                timer.unref();
+            try {
+                worker.postMessage({ type: "shutdown" });
+            }
+            catch {
+                void force();
+            }
+        });
     }
     #run(slot, code, providers) {
         if (this.#closed || slot.dead) {
@@ -200,7 +245,7 @@ export class PooledWorkerExecutor {
                 if (healthy && !r.error && slot.uses < this.#maxUses && !this.#closed)
                     this.#park(slot);
                 else
-                    void this.#destroy(slot, "recycled");
+                    void this.#destroy(slot, "recycled", healthy && !r.error);
                 resolve(r);
             };
             // Covers worker start-up too, so a worker that never becomes ready cannot hang the caller.

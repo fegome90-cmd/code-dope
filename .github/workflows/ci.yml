@@ -20,7 +20,7 @@ jobs:
         with:
           python-version: '3.13'
       - run: npm install --global npm@11.19.1 --ignore-scripts
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: npm run test:all
   package-windows:
     runs-on: windows-latest
@@ -32,7 +32,7 @@ jobs:
         with:
           node-version-file: .node-version
       - run: npm install --global npm@11.19.1 --ignore-scripts
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: npm run check:dist
       - run: npm run test:pkg
   secrets:

@@ -70,6 +70,39 @@ export async function connectMcpResources(o) {
         throw error;
     }
 }
+/** Keeps the Cloudflare compatibility result first, followed by standard MCP representations. */
+export function unwrapMcpResult(result) {
+    if ("toolResult" in result)
+        return result.toolResult;
+    const content = (result.content ?? []);
+    const text = () => content.filter((c) => c.type === "text").map((c) => c.text ?? "").join("\n");
+    if (result.isError)
+        throw new Error(text() || "Tool call failed");
+    if (result.structuredContent != null)
+        return result.structuredContent;
+    if (content.length > 0 && content.every((c) => c.type === "text")) {
+        try {
+            return JSON.parse(text());
+        }
+        catch {
+            return text();
+        }
+    }
+    return result;
+}
+export function buildUpstreamFns(tools, callTool, signal) {
+    // Keep original names for policy matching; the executor resolves aliases.
+    return Object.fromEntries(tools.map(({ name }) => [
+        name,
+        async (args) => unwrapMcpResult(await callTool({ name, arguments: (args ?? {}) }, signal ? { signal } : undefined)),
+    ]));
+}
+export function formatMcpResponse(text, maxChars, isError = false) {
+    const marker = "…[truncated]";
+    if (text.length > maxChars)
+        text = maxChars < marker.length ? marker.slice(0, maxChars) : text.slice(0, maxChars - marker.length) + marker;
+    return { content: [{ type: "text", text }], ...(isError ? { isError: true } : {}) };
+}
 /** Explicit close awaits cleanup; transport disconnect also starts it exactly once. */
 export function bindMcpCleanup(server, dispose) {
     let pending;
