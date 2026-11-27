@@ -1,0 +1,1 @@
+{"name":"code-dope-selection-research-fixture","private":true,"type":"module","scripts":{"test":"node --experimental-strip-types --test tests/selection.test.mjs tests/direct.test.mjs","test:policy-gate":"node --experimental-strip-types --test tests/policy-gate.test.mjs"}}

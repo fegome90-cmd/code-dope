@@ -1,0 +1,29 @@
+--- a/fixtures/baseline/policy.ts
++++ b/fixtures/baseline/policy.ts
+@@ -118,11 +118,14 @@
+ 
+ function runValidator(v: ArgValidator, args: unknown): string | undefined {
+   if (typeof v === "function") {
+-    const r = v(args);
+-    return r === true || r === undefined ? undefined : r;
++    const r: unknown = v(args);
++    if (r === true || r === undefined) return undefined;
++    return typeof r === "string" && r.length > 0 ? r : "validation rejected";
+   }
+   const r = v.safeParse(args);
+-  return r.success ? undefined : (r.error?.message ?? "invalid arguments");
++  if (r?.success === true) return undefined;
++  const message = r?.error?.message;
++  return typeof message === "string" && message.length > 0 ? message : "validation rejected";
+ }
+ 
+ function size(v: unknown): number {
+@@ -207,7 +210,7 @@
+         } catch (e) {
+           problem = `validator threw: ${e instanceof Error ? e.message : String(e)}`;
+         }
+-        if (problem) {
++        if (problem !== undefined) {
+           release();
+           deny(`invalid arguments: ${problem}`);
+         }
