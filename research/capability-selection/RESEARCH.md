@@ -6,6 +6,8 @@
 **Baseline:** `0bd8cbc8ed278ad93ac7f5d69c0ccc4cf932b71a` (v0.1.0).  
 **Naturaleza:** informe de seguimiento y decisión; no constituye autorización de implementación, merge ni publicación.
 
+> **PoC v4 (27-11-2026):** la Parte IV registra la implementación autorizada en el PR #13, con policy vigente, worker real, cfworker instalado y consumo por un agente. Las partes I–III conservan sus resultados históricos. El estado de esta etapa se consulta en [la evidencia del PoC](evidence/POC.md); el hardening del PR #10 permanece separado.
+
 
 
 > **Revisión v3 (27-11-2026):** la parte III contiene la nueva auditoría de repositorios, código candidato, pruebas y decisiones revisadas. Preserva las partes I–II como historial; las cifras y propuestas anteriores no constituyen el estado más reciente del fixture. Comenzar en [Parte III](#parte-iii--revisión-profunda-de-upstream-y-prototipo-integrable-v3).
@@ -1031,3 +1033,171 @@ El entorno observado es Node 22.16.0, npm 10.9.2 y TS 5.8.3; el mínimo Node del
 Decisiones tomadas para esta revisión, no aprobaciones de producción: guard de forma pequeño para el esquema cerrado (DNS impidió probar cfworker); telemetría opcional `minimal/extended` como demostración ortogonal; límite de 1024 bytes de solicitud de investigación; revalidación por revisión de host; adaptador directo privado y resultado JSON; parche de policy solo en copia temporal; probe OpenCode no integrado. La versión final debe confirmar esos contratos, mantener compatibilidad con el repo y recuperar las decisiones del agente EGM antes de tocar su código.
 
 **Conclusión:** no necesitamos reconstruir la infraestructura de configuración ni escribir otro motor. La biblioteca ya tiene contratos y controles reutilizables. El trabajo nuevo que aporta valor es pequeño: seleccionar rutas, preservar identidad y permisos, usar el adaptador correcto y demostrarlo con pruebas. Mantener una capacidad opcional no implica cargarla en cada consumidor, y tampoco justifica incorporar un nuevo backend sin verificar su coste total.
+
+
+# PARTE IV — PoC funcional con componentes reales, v4
+
+## 25. Alcance y baseline verificado
+
+Esta etapa continúa el PR #13 sobre `9ea7c8e66e0b8ca7a566c7a43b1801c3e0298759`.
+La rama sigue siendo `feat/capability-selection-research`, con destino `developer`.
+El ancla del mantenedor autoriza implementación y actualización del PR exclusivamente
+bajo `research/capability-selection/`. No autoriza cambios en `src/`, `dist/`,
+dependencias de producción, CI, lockfiles, el PR #10, merge o publicación.
+
+Se inspeccionaron las reglas del repositorio, el ruleset activo, los workflows,
+la investigación completa y los contratos originales. El preflight encontró el
+checkout inicial limpio, cero conversaciones de revisión y los cuatro jobs del
+run `45991966419` en verde. Los [recibos de baseline](evidence/poc-baseline.json)
+registran las versiones y los hashes de los archivos protegidos.
+
+El entorno actual sí pudo instalar el lockfile: Node 24.22.3, npm 11.19.1 y
+TypeScript 5.9.3. `npm ci` terminó con código 0. No se trasladan a esta etapa las
+limitaciones DNS ni la versión inferior de Node observadas en el experimento v3.
+
+La reproducción original de `verify.sh` detectó un defecto del script: analizaba
+TAP, pero este Node emitía otro formato por defecto. Ejecutar exactamente los
+mismos tests con TAP explícito reprodujo 55/55 positivos, 220/220 comparaciones,
+las cinco regresiones rojas y las cinco verdes tras el parche temporal.
+La nueva verificación fija el reporter y deja los recibos históricos intactos.
+
+## 26. Implementación y propiedad de la configuración
+
+Se conserva el selector v3. Sólo se reemplaza su validación de forma manual por
+`@cfworker/json-schema` 4.1.6, ya instalado por el lockfile. La paridad independiente
+mantiene los 220 casos del esquema original: 15 aceptados y 205 rechazados. El límite
+de bytes y la autorización del host siguen siendo controles distintos del esquema.
+
+La API pequeña `createCapabilityClient(host)` ofrece `capabilities`, `resolve` y
+`run`. El CLI usa `node:util.parseArgs()` sobre esa API. No se añadió un ejecutable
+público, un registry, un sistema de flags, otra policy ni un modelo que decida rutas.
+
+| Dato | Autoridad | Regla |
+| --- | --- | --- |
+| Modo solicitado en el sobre | Agente | OFF limita a directo; ON a programático; AUTO permite elección contextual |
+| Ruta y telemetría solicitadas | Agente | Datos validados contra esquema cerrado |
+| Disponibilidad | Host | Sólo declara capacidades presentes y adaptadores suministrados |
+| Rutas concedidas | Usuario o administrador mediante host | No pueden ampliarse por configuración del agente |
+| Restricción de modo, policy y aprobaciones | Sistema y host | Se preservan aunque el agente pida AUTO |
+| Revisión y versión de policy | Host | Deben cambiar al modificar la autoridad o las capacidades |
+| Plan efectivo | Resolver | Es evidencia de selección, no una credencial |
+
+El esquema raw v3 sigue rechazando `mode`, permisos, policy e imports. El modo
+solicitado se sitúa en un sobre separado, con la operación. Esa separación permite
+pedir ON/OFF/AUTO sin convertir una preferencia del agente en autoridad. Una llamada
+directa y un programa tienen formas distintas; una combinación incompatible se
+rechaza antes de cargar el runtime.
+
+El dispatcher conserva el snapshot de la operación y revalida después del import.
+La instancia local se crea sólo tras esa revalidación. El resultado incorpora la
+revisión efectivamente usada para despachar. No hay fallback ni retry automático.
+El contexto versionado no promete atomicidad distribuida: el host debe publicar
+revisiones coherentes y aplicar los permisos de las herramientas mediante policy.
+
+## 27. Reutilización y procedencia
+
+| Componente | Origen, versión y símbolo | Licencia y modificación |
+| --- | --- | --- |
+| Selector | PR #13, `9ea7c8e`, `selection.mjs`: `resolve`, `capabilities`, `executeRequested` | Código propio MIT; guard de forma reemplazado, semántica y esquema conservados |
+| Llamada directa | `fixtures/baseline/direct.ts`, candidato v3 | Código propio MIT; adaptado en `poc/direct.ts` para importar la policy vigente |
+| Autorización y auditoría | Code Dope `0bd8cbc8`, `src/policy.ts`: `withPolicy`, `createAuditLog`, `collisions`, `policyAllows` | MIT; importados sin copiar ni modificar el núcleo |
+| Validación | `@cfworker/json-schema` 4.1.6, `Validator` | MIT; dependencia existente, sin código vendorizado nuevo |
+| Ejecución local | Code Dope `src/executor/default.ts`, `createDefaultExecutor` | MIT; import dinámico y uso de los ejecutores existentes |
+| Aislamiento | `quickjs-emscripten` 0.32.0 y WorkerExecutor vigente | MIT; sin otro sandbox, pool o gestor de memoria |
+| Contrato nativo | `@cloudflare/codemode` 0.5.6, `Executor` y `ResolvedProvider` | MIT; imports de tipos, adaptador suministrado por host |
+| Descubrimiento | `catalog/patterns.json` 0.1.0 | Código propio MIT; índice descriptivo leído como datos, no nuevo registry |
+| CLI | Node 24.22.3, `node:util.parseArgs` | API de Node; sin framework añadido ni código externo copiado |
+
+Los tres archivos originales conservan sus Git blobs, SHA-256 y avisos de licencia
+en [source-manifest.json](source-manifest.json). No se modificó `src/vendor/`.
+El test de carga es instrumentación propia, restringida a fixtures de prueba.
+No hay nuevas dependencias de producción o desarrollo, ni un segundo lockfile.
+
+`createCodeRunner` se inspeccionó, pero su import inicial carga la fábrica local.
+Para OFF se reutiliza directamente la policy. `src/discovery.ts` todavía arrastra
+MCP y ejecutores; el catálogo existente satisface el descubrimiento de este PoC sin
+importar ese módulo ni extraer ahora un discovery core.
+
+## 28. Carga observada y ejecución real
+
+La prueba P08 usa procesos nuevos. Un hook de Node registra cargas de módulos sin
+transformar su source; el observador de Worker invoca el constructor original.
+La instrumentación heredada en el thread observa las APIs de WebAssembly y
+clasifica la inicialización que procede de QuickJS. No se modifica el runtime.
+
+| Escenario | Módulos de ejecución locales | Worker creado | Inicialización WASM de QuickJS |
+| --- | --- | --- | --- |
+| Importar API o resolver | Ninguno observado | 0 | 0 |
+| OFF directo | Ninguno observado | 0 | 0 |
+| Contrato nativo simulado | Ninguno observado | 0 | 0 |
+| Configuración inválida, ruta denegada o no disponible | Ninguno observado | 0 | 0 |
+| Importar fábrica y preparar WorkerExecutor sin ejecutar | Clases worker, inline y pool cargadas | 0 | 0 |
+| Programa mediante worker real | Módulos de la fábrica y del worker cargados | 1 | Observada dentro del thread |
+
+Node utiliza otro WASM, Amaro, para eliminar tipos de TypeScript. Su presencia no
+acredita que QuickJS se inicialice. Tampoco se interpreta ausencia de un resultado
+como prueba de ausencia de carga: las comprobaciones inspeccionan los eventos.
+
+La prueba observa carga de source y creación WASM; no cuenta cada objeto interno
+QuickJSRuntime o QuickJSContext. No acredita instalación sin QuickJS. Cuando se
+selecciona worker, la fábrica existente importa también las definiciones inline y
+pool. Separar imports por backend exigiría otro cambio del núcleo y queda fuera.
+
+## 29. Consumo por un agente y verificación
+
+Un subagente real, con contexto de conversación nuevo, recibió tareas sintéticas
+sin una ruta preseleccionada. Descubrió las capacidades por CLI, eligió la ruta,
+resolvió la configuración, ejecutó e inspeccionó la auditoría. No se añadió un
+servicio LLM al producto. Los [recibos completos](evidence/agent-consumption.json)
+conservan solicitudes, resultados y códigos de salida.
+
+| Tarea | Elección contextual en AUTO | Resultado observado |
+| --- | --- | --- |
+| Sumar `[11,-4,8]` | `direct`, una llamada | `15`, una llamada auditada |
+| Sumar tres grupos, filtrar subtotales y volver a sumar | `worker`, composición en una ejecución | Subtotales `[11,3,11]`, retenidos `[11,11]`, total `22`; cuatro llamadas auditadas |
+| Solicitar native en este host | Prueba explícita de disponibilidad | `UNAVAILABLE`, exit 1, sin resultado de fallback |
+
+Esto acredita consumo real del CLI en este entorno. La matriz determinista del
+resolver se registra aparte: no se presenta como decisión contextual de un agente.
+Native mantiene `NOT_VERIFIED`; el test de su adapter sólo verifica que recibe
+funciones protegidas y conserva el resultado y la auditoría.
+
+La verificación del PoC reúne 30 pruebas nuevas, las 55 originales, la paridad del
+esquema, dos comprobaciones de tipos y el experimento aislado de policy. Las pruebas
+nuevas cubren llamadas directas, worker, revocación durante carga, presupuesto,
+aprobaciones, colisiones, errores parciales, timeout con resultado desconocido,
+auditoría mínima y extendida, CLI y observación de carga. La [matriz P01–P15](evidence/POC.md)
+registra el resultado de cada criterio y los gates del repositorio.
+
+Los ciclos RED → GREEN adicionales corrigieron fallos concretos del PoC: plan
+obsoleto en el recibo, auditoría perdida al rechazar un executor nativo después de
+una llamada, pérdida de evidencia si falla el cierre del pool y falso éxito ante
+un error con mensaje vacío. La revisión independiente encontró también pérdida
+de resultado y auditoría si el host retiraba el adaptador native durante una
+escritura iniciada. Se capturan ahora el adaptador invocado y su verificación;
+la regresión cubre retirada y reemplazo. Un segundo revisor confirmó la corrección
+y reejecutó la suite completa; el [recibo](evidence/review.json) registra el alcance.
+Las pruebas mantienen el resultado de la herramienta y no repiten la operación
+después de un fallo de entrega o limpieza.
+
+## 30. Defectos del núcleo y STOP GATE
+
+Se volvieron a ejecutar las cinco regresiones tanto contra el fixture como contra
+`src/policy.ts` vigente. Cada grupo produjo 0/5 PASS y 5/5 FAIL, exit 1. La policy
+actual aún permite los retornos malformados documentados en v3. El PoC no integra
+el parche experimental ni crea un segundo mecanismo de autorización.
+
+Los validadores del host sintético devuelven `true` o un mensaje no vacío, según
+el contrato actual. En una copia temporal, el parche experimental conserva las
+55 pruebas y obtiene 5/5 en las regresiones. El recibo distingue ese éxito aislado
+del FAIL que sigue presente en el núcleo.
+
+El resultado permite revisar un PoC funcional con componentes reales. Quedan para
+una etapa autorizada posterior: integración con el núcleo endurecido, diseño de
+exports ligeros y empaquetado, un host nativo real y cualquier backend alternativo.
+OpenCode no bloquea esta entrega. El límite de presupuesto sigue siendo por
+ejecución; el pool no adquiere una garantía de estabilidad prolongada y una
+escritura iniciada puede terminar después del timeout.
+
+El trabajo se detiene en la entrega del candidato y su evidencia. El mantenedor
+revisa antes de autorizar integración definitiva, promoción o publicación.
