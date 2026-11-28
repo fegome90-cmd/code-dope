@@ -1,0 +1,2 @@
+Draft7 schema parity: 220/220 cases; 15 accepted, 205 rejected; no mismatches.
+JSON Schema is shape only; raw byte limit and host authorization are separate runtime checks.

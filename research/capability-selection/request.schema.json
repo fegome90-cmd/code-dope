@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "route"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "route": {
+      "enum": [
+        "direct",
+        "native",
+        "worker",
+        "inline",
+        "pool"
+      ]
+    },
+    "telemetry": {
+      "enum": [
+        "minimal",
+        "extended"
+      ]
+    }
+  }
+}
