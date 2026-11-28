@@ -1,8 +1,9 @@
 # Evidencia del PoC funcional
 
 Fecha: 27 de noviembre de 2026. Base de implementación: `9ea7c8e66e0b8ca7a566c7a43b1801c3e0298759`.
-Los archivos de esta entrega pertenecen exclusivamente al PR #13 y al directorio
-de investigación. El [handoff](../HANDOFF-POC.md) conserva los límites del cierre.
+La evidencia original pertenece al carril de investigación. El candidato de
+integración incluye además el arreglo de policy `8665e7f`. El
+[handoff](../HANDOFF-POC.md) conserva los límites del cierre.
 
 ## Resultados ejecutados
 
@@ -27,10 +28,11 @@ La tabla conserva los resultados históricos del 27 de noviembre de 2026.
 | Native real | NOT_VERIFIED | Adaptador contractual simulado; ningún host nativo acreditado |
 
 El recibo histórico contabilizaba por separado los cinco fallos del núcleo de
-esa fecha. En la base posterior `08c1854`, la policy del núcleo pasa cuatro de
-cinco casos. El verificador actual registra ese resultado, completa los controles
-restantes y devuelve 1 si la policy no supera el gate. Los recibos versionados
-siguen siendo evidencia de la ejecución histórica.
+esa fecha. En la base posterior `08c1854` pasaron cuatro de cinco casos.
+En el candidato con el arreglo `8665e7f`, el control de la policy actual pasa
+**5/5**, incluido `malformed-safeParse`. Si ese control falla, el verificador
+completa los pasos restantes y devuelve 1. Los recibos versionados conservan
+los resultados históricos.
 
 El typecheck del PoC usa `skipLibCheck: true` y no comprueba todos los internos de
 las declaraciones de terceros. El typecheck contractual conserva `skipLibCheck: false`
@@ -102,8 +104,8 @@ conversación nuevo no implica aislamiento del sistema de archivos.
 
 ## Límites que permanecen
 
-- Los cinco defectos fail-closed del núcleo siguen en FAIL; corresponde al carril
-  de hardening resolverlos. La integración de producción queda BLOCKED por ese cierre.
+- El resultado 5/5 de la policy actual cubre sólo estos casos fail-closed; no
+  acredita aptitud para producción ni reemplaza la revisión del mantenedor.
 - Native real, OpenCode y UTCP permanecen NOT_VERIFIED en esta etapa.
 - Los presupuestos de policy son por ejecución. No existe un presupuesto de tarea
   acumulado entre llamadas directas independientes.

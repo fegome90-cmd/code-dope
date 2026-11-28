@@ -2,13 +2,13 @@
 
 Este PoC permite descubrir capacidades, solicitar OFF, ON o AUTO, resolver un
 plan y ejecutar herramientas sintéticas mediante la policy actual de Code Dope.
-La ruta local usa el worker existente y QuickJS real. Todos los cambios permanecen
-en esta carpeta de investigación; el paquete y el núcleo conservan sus contratos.
+La ruta local usa el worker existente y QuickJS real. El PoC vive en esta carpeta
+de investigación. El candidato de integración suma el arreglo de la policy del
+núcleo en `8665e7f`, sin cambiar los exports del paquete.
 
 El [registro de evidencia](evidence/POC.md) distingue las pruebas ejecutadas,
-los fallos conocidos y las integraciones no verificadas. El PR permanece en
-borrador para revisión del mantenedor. El PoC no acredita aptitud de producción
-del núcleo ni corrige el hardening del PR #10.
+los resultados históricos y las integraciones no verificadas. El PoC no acredita
+aptitud de producción del núcleo ni sustituye su hardening.
 
 ## Ejecutar desde la raíz del repositorio
 
@@ -148,9 +148,10 @@ node --test research/capability-selection/tests/verify.test.mjs
   de tarea. Este PoC no añade un segundo contador.
 - Una escritura que ya empezó puede terminar después de un timeout. Su resultado
   queda como `unknown`; no se reintenta. Un error de entrega tampoco revierte la escritura.
-- Con la base `08c1854`, la policy del núcleo pasa cuatro de los cinco casos
-  fail-closed. `malformed-safeParse` sigue fallando. El parche experimental
-  valida los cinco casos en una copia de la policy histórica; no modifica `src/`.
+- En la base histórica `08c1854` pasaron cuatro de los cinco casos fail-closed.
+  Con el arreglo `8665e7f`, la policy del candidato de integración supera los
+  **5/5**, incluido `malformed-safeParse`. El parche experimental se aplica
+  sólo a una copia de la policy histórica, no a `src/`.
 - No se validan OpenCode, UTCP, un host nativo real, instalación sin QuickJS ni
   estabilidad prolongada del pool. Los workers comparten proceso con el host.
 

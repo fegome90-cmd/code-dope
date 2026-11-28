@@ -8,8 +8,9 @@ el [README](README.md) contiene los comandos y el formato de configuración.
 
 La implementación parte de `9ea7c8e66e0b8ca7a566c7a43b1801c3e0298759`, en
 `feat/capability-selection-research` hacia `developer`. Se conserva el PR existente.
-Todos los cambios de esta etapa están en `research/capability-selection/`.
-No se modifican núcleo, distribución, dependencias de producción, lockfiles o CI.
+La etapa original se limitó a `research/capability-selection/`. El candidato
+de integración añade por separado el arreglo `8665e7f` en la policy del núcleo
+y su distribución. No cambia dependencias de producción, lockfiles ni CI.
 No hay merge, promoción, publicación ni auto-merge.
 
 ## Leer y reproducir
@@ -27,10 +28,11 @@ npm run test:all
 
 El recibo histórico registra 30 pruebas nuevas, 55 originales, 220 comparaciones
 del esquema, dos typechecks y las pruebas completas del repositorio.
-En la base `08c1854`, la policy del núcleo pasa cuatro de cinco casos; sigue
-fallando `malformed-safeParse`. El verificador completa las comprobaciones
-restantes y devuelve 1 mientras ese caso siga fallando. La policy histórica conserva
-sus cinco fallos esperados y la copia temporal parcheada pasa los cinco casos.
+En la base histórica `08c1854` pasaron cuatro de cinco casos. El candidato
+con el arreglo `8665e7f` supera los **5/5**, incluido `malformed-safeParse`.
+Si el control vigente falla, el verificador completa las comprobaciones
+restantes y termina con código 1. El fixture histórico conserva sus cinco
+fallos esperados y la copia temporal parcheada pasa los cinco casos.
 La revisión independiente encontró una carrera del adaptador native; se corrigió
 y otro revisor confirmó el arreglo y la suite, sin hallazgos materiales pendientes.
 El [recibo de revisión](evidence/review.json) conserva los hashes y resultados.
@@ -50,8 +52,8 @@ El [recibo de revisión](evidence/review.json) conserva los hashes y resultados.
 ## Pendientes para una etapa autorizada posterior
 
 1. Revisar este candidato. El STOP GATE impide continuar por iniciativa propia.
-2. Resolver por separado el fallo pendiente de la policy antes de integrar la
-   nueva entrada al núcleo. Ese cambio no pertenece al PoC.
+2. Mantener los cinco casos como control de la policy vigente. Este resultado
+   no acredita aptitud para producción.
 3. Elegir exports ligeros y comprobar consumo del paquete fuera de este árbol de
    investigación; no prometer hoy instalación o import raíz sin QuickJS.
 4. Conectar un host nativo real si existe una necesidad. La simulación actual sólo
