@@ -1,0 +1,5 @@
+{
+  "mode": "auto",
+  "request": { "schemaVersion": 1, "route": "worker" },
+  "operation": { "kind": "program", "code": "async () => { const a = await math.sum({values:[2,3]}); return await math.sum({values:[a,7]}); }" }
+}

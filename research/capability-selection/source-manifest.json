@@ -1,0 +1,20 @@
+[
+  {
+    "local": "fixtures/baseline/policy.ts",
+    "source": "https://github.com/fegome90-cmd/code-dope/blob/0bd8cbc8ed278ad93ac7f5d69c0ccc4cf932b71a/src/policy.ts",
+    "gitBlob": "016d9f46c72d30284148f602261b275d8d18e933",
+    "sha256": "3ad82f06225013ffd261830e95ddd80d1067ce75cd92d3abe0f5f8895550a941"
+  },
+  {
+    "local": "fixtures/baseline/vendor/cf-utils.ts",
+    "source": "https://github.com/fegome90-cmd/code-dope/blob/0bd8cbc8ed278ad93ac7f5d69c0ccc4cf932b71a/src/vendor/cf-utils.ts",
+    "gitBlob": "bbd22be192df64e6a69ce617007d5836f29b4481",
+    "sha256": "da2160d0f1bf57d21d4fb66bfb0deeef30784f4b47a6717702c740dc4171eaef"
+  },
+  {
+    "local": "fixtures/upstream/executor-types.ts",
+    "source": "https://github.com/cloudflare/agents/blob/841b6fc92816d3369dbef7ed3f39168519409248/packages/codemode/src/executor-types.ts",
+    "gitBlob": "a087d0a0200d7bcbc19fe16e74d56d6c995aeb9b",
+    "sha256": "7ad9b30dd402476caca4e84f4a7177302b7568f864c463886807e5b186523e8a"
+  }
+]

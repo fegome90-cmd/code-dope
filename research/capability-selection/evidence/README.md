@@ -1,0 +1,15 @@
+# Evidence and reproduction
+
+Current PoC evidence is in [POC.md](POC.md), [poc-verification.json](poc-verification.json)
+[agent-consumption.json](agent-consumption.json) and [review.json](review.json).
+These record the real policy,
+worker, validator and agent runs from the implementation stage. The text and short
+receipts below describe the earlier v3 fixture and remain historical.
+
+## Historical v3 receipts
+
+The v3 research ZIP was verified against its SHA-256 manifest and extracted to a temporary directory for a fresh execution on 2026-11-27. The unmodified fixture produced 55/55 positive tests, 220/220 schema comparisons, and the expected 0/5 baseline policy regression gate (exit 1). After the experimental patch was applied **only to a temporary copy**, the positive suite remained 55/55 and the policy regression gate passed 5/5 (exit 0). The original policy Git blob stayed unchanged.
+
+The short receipts in this directory are from the v3 fixture. Raw TAP logs and the original ZIP-wide checksum list are not committed here: the logs include local machine paths, and the ZIP contains files not versioned in this research tree. The original artifact remains the source of that historical evidence. Reproduce new receipts in a disposable copy using `sh verify.sh` (see the parent README). Keep logs containing local paths out of Git.
+
+Full repository CI, the npm package install, actual QuickJS/UTCP/OpenCode execution and real agent integrations were not re-run in this environment. The observed Node 22.16.0 is below the repository's minimum. The research PR must remain a draft until the repository gates and independent review are satisfied. The historical report's statements about ZIP contents describe the original delivery, not a promise that every ZIP artifact is committed.

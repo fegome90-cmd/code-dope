@@ -1,0 +1,549 @@
+{
+  "schemaVersion": 1,
+  "evidenceKind": "real-host-agent-session",
+  "session": "independent-agent-consumer",
+  "result": "PASS",
+  "nativeVerification": "NOT_VERIFIED",
+  "scope": "Task-driven consumption of the existing CLI and fixed synthetic host; no new dependencies or runtime providers.",
+  "routeSelection": "The real host agent chose request.route after discovery based on each task. The resolver validated that request. This session is distinct from automated resolver fixtures.",
+  "restrictions": {
+    "repositoryReadOnly": true,
+    "noCredentials": true,
+    "noNetwork": true,
+    "noExternalEffects": true,
+    "programTextExecutedOnlyByExistingCliSandbox": true
+  },
+  "sourceFilesRead": [
+    "research/capability-selection/poc/run.schema.json",
+    "research/capability-selection/poc/client.ts"
+  ],
+  "discovery": {
+    "command": "node research/capability-selection/poc/cli.mjs capabilities --json",
+    "cwd": "code-dope",
+    "exitCode": 0,
+    "invocations": 2,
+    "exitCodes": [
+      0,
+      0
+    ],
+    "captureNote": "Initial discovery preceded all choices; the identical response was captured again for the evidence artifact.",
+    "availableRoutes": [
+      "direct",
+      "worker",
+      "inline",
+      "pool"
+    ],
+    "allowedRoutes": [
+      "direct",
+      "worker"
+    ],
+    "output": {
+      "ok": true,
+      "availableRoutes": [
+        "direct",
+        "worker",
+        "inline",
+        "pool"
+      ],
+      "allowedRoutes": [
+        "direct",
+        "worker"
+      ],
+      "mandatory": {
+        "mode": "auto",
+        "policy": true,
+        "approvalForWrites": true,
+        "audit": true
+      },
+      "effective": {
+        "revision": "synthetic-host-v1",
+        "mode": "auto",
+        "routes": [
+          "direct",
+          "worker"
+        ],
+        "telemetry": [
+          "minimal"
+        ]
+      },
+      "tools": [
+        {
+          "provider": "math",
+          "tool": "sum",
+          "description": "Return the sum of values; empty input returns zero.",
+          "inputSchema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "values"
+            ],
+            "properties": {
+              "values": {
+                "type": "array",
+                "maxItems": 100,
+                "items": {
+                  "type": "number",
+                  "minimum": -1000000,
+                  "maximum": 1000000
+                }
+              }
+            }
+          }
+        },
+        {
+          "provider": "store",
+          "tool": "save",
+          "description": "Append a synthetic note in memory. Requires host approval, absent in this CLI.",
+          "inputSchema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "note"
+            ],
+            "properties": {
+              "note": {
+                "type": "string",
+                "maxLength": 200
+              }
+            }
+          }
+        }
+      ],
+      "patternCatalog": {
+        "version": "0.1.0",
+        "patterns": [
+          {
+            "id": "mcp-code-tool",
+            "tasks": [
+              "wrap an MCP server",
+              "expose tools as code",
+              "code mode for MCP",
+              "reduce tool round-trips"
+            ]
+          },
+          {
+            "id": "search-execute-server",
+            "tasks": [
+              "large tool catalog",
+              "progressive discovery",
+              "tool search",
+              "don't load all schemas"
+            ]
+          },
+          {
+            "id": "search-tools",
+            "tasks": [
+              "rank tools for a query",
+              "selective schema fetch",
+              "types for a subset of tools"
+            ]
+          },
+          {
+            "id": "code-runner",
+            "tasks": [
+              "plugin with in-process tools",
+              "run model code without MCP",
+              "add code mode to a plugin"
+            ]
+          },
+          {
+            "id": "sandbox-executors",
+            "tasks": [
+              "sandbox model-generated JavaScript in Node",
+              "Executor for @cloudflare/codemode outside Workers",
+              "don't block the host event loop",
+              "reuse warm sandbox workers to cut per-execution latency"
+            ]
+          },
+          {
+            "id": "policy",
+            "tasks": [
+              "allowlist tools",
+              "approve writes",
+              "validate arguments",
+              "call budget",
+              "per-call timeout",
+              "audit log",
+              "block unauthorized operations"
+            ]
+          },
+          {
+            "id": "parallel",
+            "tasks": [
+              "independent calls in parallel",
+              "bounded concurrency",
+              "partial results"
+            ]
+          },
+          {
+            "id": "paginate",
+            "tasks": [
+              "cursor pagination",
+              "fetch all pages",
+              "page limit"
+            ]
+          },
+          {
+            "id": "filter-before-return",
+            "tasks": [
+              "reduce output to model",
+              "filter results",
+              "project fields",
+              "summarize",
+              "group counts"
+            ]
+          },
+          {
+            "id": "retry-idempotent",
+            "tasks": [
+              "retry transient failures",
+              "safe retries"
+            ]
+          },
+          {
+            "id": "batch",
+            "tasks": [
+              "process in chunks",
+              "batch operations"
+            ]
+          },
+          {
+            "id": "evidence-and-structured-result",
+            "tasks": [
+              "structured output",
+              "execution evidence",
+              "report what happened"
+            ]
+          },
+          {
+            "id": "recipe-paginated-filter",
+            "tasks": [
+              "list everything and filter",
+              "count matching items",
+              "report by group"
+            ]
+          },
+          {
+            "id": "recipe-fan-out-enrich",
+            "tasks": [
+              "list then fetch details",
+              "enrich items",
+              "N+1 lookups"
+            ]
+          },
+          {
+            "id": "recipe-guarded-bulk-update",
+            "tasks": [
+              "bulk write",
+              "update many",
+              "dry run",
+              "controlled writes"
+            ]
+          }
+        ]
+      },
+      "nativeVerification": "NOT_VERIFIED"
+    }
+  },
+  "cases": [
+    {
+      "id": "A",
+      "task": "Compute sum of [11,-4,8] with the host tool.",
+      "mode": "auto",
+      "route": "direct",
+      "reason": "A single host math.sum call needs no composition.",
+      "resolve": {
+        "command": "node research/capability-selection/poc/cli.mjs resolve --config <fixture>/task-a.json",
+        "cwd": "code-dope",
+        "exitCode": 0,
+        "output": {
+          "ok": true,
+          "plan": {
+            "schemaVersion": 1,
+            "route": "direct",
+            "telemetry": "minimal",
+            "mode": "auto",
+            "policyVersion": "synthetic-policy-v1",
+            "revision": "synthetic-host-v1",
+            "requestedMode": "auto",
+            "selectorVersion": "poc-v4"
+          }
+        }
+      },
+      "run": {
+        "command": "node research/capability-selection/poc/cli.mjs run --config <fixture>/task-a.json",
+        "cwd": "code-dope",
+        "exitCode": 0,
+        "output": {
+          "result": 15,
+          "logs": [],
+          "audit": [
+            {
+              "seq": 1,
+              "provider": "math",
+              "tool": "sum",
+              "kind": "read",
+              "argsChars": 20,
+              "decision": "allowed",
+              "ok": true,
+              "outcome": "done",
+              "durationMs": 1,
+              "resultChars": 2
+            }
+          ],
+          "droppedAuditRecords": 0,
+          "plan": {
+            "schemaVersion": 1,
+            "route": "direct",
+            "telemetry": "minimal",
+            "mode": "auto",
+            "policyVersion": "synthetic-policy-v1",
+            "revision": "synthetic-host-v1",
+            "requestedMode": "auto",
+            "selectorVersion": "poc-v4"
+          },
+          "ok": true,
+          "nativeVerification": "NOT_APPLICABLE"
+        }
+      },
+      "result": 15,
+      "audit": {
+        "records": 1,
+        "allowed": 1,
+        "successful": 1,
+        "dropped": 0
+      },
+      "attempts": 1,
+      "request": {
+        "mode": "auto",
+        "request": {
+          "schemaVersion": 1,
+          "route": "direct"
+        },
+        "operation": {
+          "kind": "call",
+          "provider": "math",
+          "tool": "sum",
+          "args": {
+            "values": [
+              11,
+              -4,
+              8
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": "B",
+      "task": "Sum each group with math.sum, retain totals >=10, and sum retained totals with math.sum in one configured execution.",
+      "mode": "auto",
+      "route": "worker",
+      "reason": "A permitted worker can compose the group calls, filter their returned totals, and make the dependent grand-total call in one sandbox execution.",
+      "resolve": {
+        "command": "node research/capability-selection/poc/cli.mjs resolve --config <fixture>/task-b.json",
+        "cwd": "code-dope",
+        "exitCode": 0,
+        "output": {
+          "ok": true,
+          "plan": {
+            "schemaVersion": 1,
+            "route": "worker",
+            "telemetry": "minimal",
+            "mode": "auto",
+            "policyVersion": "synthetic-policy-v1",
+            "revision": "synthetic-host-v1",
+            "requestedMode": "auto",
+            "selectorVersion": "poc-v4"
+          }
+        }
+      },
+      "run": {
+        "command": "node research/capability-selection/poc/cli.mjs run --config <fixture>/task-b.json",
+        "cwd": "code-dope",
+        "exitCode": 0,
+        "output": {
+          "result": {
+            "totals": [
+              11,
+              3,
+              11
+            ],
+            "retained": [
+              11,
+              11
+            ],
+            "grandTotal": 22
+          },
+          "logs": [],
+          "audit": [
+            {
+              "seq": 1,
+              "provider": "math",
+              "tool": "sum",
+              "kind": "read",
+              "argsChars": 16,
+              "decision": "allowed",
+              "ok": true,
+              "outcome": "done",
+              "durationMs": 1,
+              "resultChars": 2
+            },
+            {
+              "seq": 2,
+              "provider": "math",
+              "tool": "sum",
+              "kind": "read",
+              "argsChars": 17,
+              "decision": "allowed",
+              "ok": true,
+              "outcome": "done",
+              "durationMs": 1,
+              "resultChars": 1
+            },
+            {
+              "seq": 3,
+              "provider": "math",
+              "tool": "sum",
+              "kind": "read",
+              "argsChars": 17,
+              "decision": "allowed",
+              "ok": true,
+              "outcome": "done",
+              "durationMs": 0,
+              "resultChars": 2
+            },
+            {
+              "seq": 4,
+              "provider": "math",
+              "tool": "sum",
+              "kind": "read",
+              "argsChars": 18,
+              "decision": "allowed",
+              "ok": true,
+              "outcome": "done",
+              "durationMs": 0,
+              "resultChars": 2
+            }
+          ],
+          "droppedAuditRecords": 0,
+          "plan": {
+            "schemaVersion": 1,
+            "route": "worker",
+            "telemetry": "minimal",
+            "mode": "auto",
+            "policyVersion": "synthetic-policy-v1",
+            "revision": "synthetic-host-v1",
+            "requestedMode": "auto",
+            "selectorVersion": "poc-v4"
+          },
+          "ok": true,
+          "nativeVerification": "NOT_APPLICABLE"
+        }
+      },
+      "result": {
+        "totals": [
+          11,
+          3,
+          11
+        ],
+        "retained": [
+          11,
+          11
+        ],
+        "grandTotal": 22
+      },
+      "audit": {
+        "records": 4,
+        "allowed": 4,
+        "successful": 4,
+        "dropped": 0
+      },
+      "configuredExecutions": 1,
+      "attempts": 1,
+      "request": {
+        "mode": "auto",
+        "request": {
+          "schemaVersion": 1,
+          "route": "worker"
+        },
+        "operation": {
+          "kind": "program",
+          "code": "async () => { const groups = [[4, 7], [-2, 5], [10, 1]]; const totals = []; for (const values of groups) { totals.push(await math.sum({ values })); } const retained = totals.filter(total => total >= 10); const grandTotal = await math.sum({ values: retained }); return { totals, retained, grandTotal }; }"
+        }
+      }
+    },
+    {
+      "id": "native-availability",
+      "task": "Request native for a tiny synthetic program and observe rejection.",
+      "mode": "auto",
+      "route": "native",
+      "reason": "Availability check for the undiscovered native route; this does not claim a native runtime exists.",
+      "resolve": {
+        "command": "node research/capability-selection/poc/cli.mjs resolve --config <fixture>/native-unavailable.json",
+        "cwd": "code-dope",
+        "exitCode": 1,
+        "output": {
+          "ok": false,
+          "error": {
+            "code": "UNAVAILABLE",
+            "message": "UNAVAILABLE"
+          },
+          "audit": []
+        }
+      },
+      "run": {
+        "command": "node research/capability-selection/poc/cli.mjs run --config <fixture>/native-unavailable.json",
+        "cwd": "code-dope",
+        "exitCode": 1,
+        "output": {
+          "ok": false,
+          "error": {
+            "code": "UNAVAILABLE",
+            "message": "UNAVAILABLE"
+          },
+          "audit": []
+        }
+      },
+      "resolveError": {
+        "code": "UNAVAILABLE",
+        "message": "UNAVAILABLE"
+      },
+      "runError": {
+        "code": "UNAVAILABLE",
+        "message": "UNAVAILABLE"
+      },
+      "audit": {
+        "records": 0,
+        "allowed": 0,
+        "successful": 0,
+        "dropped": 0
+      },
+      "fallbackResultObserved": false,
+      "nativeVerification": "NOT_VERIFIED",
+      "request": {
+        "mode": "auto",
+        "request": {
+          "schemaVersion": 1,
+          "route": "native"
+        },
+        "operation": {
+          "kind": "program",
+          "code": "async () => 1"
+        }
+      }
+    }
+  ],
+  "auditTotals": {
+    "records": 5,
+    "allowed": 5,
+    "successful": 5,
+    "dropped": 0
+  },
+  "limitations": [
+    "Uses the existing synthetic CLI host and math.sum tool.",
+    "Does not verify native adapter or native runtime execution.",
+    "Does not replace automated resolver, schema, security, or regression tests."
+  ],
+  "reproduction": "Write each request to a JSON file and use the documented CLI commands. Choices were made by a real agent before execution; replay reproduces results, not a new agent decision."
+}
