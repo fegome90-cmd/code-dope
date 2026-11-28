@@ -1,5 +1,13 @@
 # Hoja de ruta
 
+## Candidato actual del PR #2
+
+Las Fases 1–3 de [PLAN.md](../PLAN.md) implementan una biblioteca de Code Mode con QuickJS-WASM, policy host fail-closed y adaptadores MCP. El [handoff de Fase 3](../HANDOFF-2026-11-26-PHASE-3.md) registra sus pruebas locales y límites; no concede permisos de merge. El candidato se integra sobre `developer` con npm y `package-lock.json`, conservando el control del índice de Git del #4 y los tres checks requeridos. El consumidor del tarball verifica las API JS/TS y los tres modos de ejecución. Pool sigue opt-in y su crash nativo permanece sin causa confirmada.
+
+M8/M9, publicación, despliegue y llamadas nativas a sistemas reales siguen fuera de alcance. El dueño autorizó la [licencia MIT del código propio](../LICENSE), con copyright «2026 Felipe González»; esa decisión no autoriza merge. No confundir esta implementación con la propuesta declarativa de bootstrap que se conserva a continuación como antecedente.
+
+## Propuesta histórica del bootstrap
+
 | Fase | Entrega | Criterio de salida |
 | --- | --- | --- |
 | 0. Fundación | Paquete ESM privado, tipado estricto, lockfile, prueba de empaquetado y CI | Un consumidor externo importa el tarball en JavaScript y resuelve las declaraciones en TypeScript. No hay dependencias de ejecución. |

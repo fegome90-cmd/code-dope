@@ -9,7 +9,7 @@ case ${1:-} in
     snapshot=$(mktemp -d "${TMPDIR:-/tmp}/code-dope-secrets.XXXXXXXX")
     trap 'rm -rf -- "$snapshot"' EXIT
     trap 'exit 1' HUP INT TERM
-    node scripts/scan-staged-secrets.mjs "$snapshot"
+    node scripts/scan-staged-secrets.mjs "${snapshot}"
     exit
     ;;
   history)

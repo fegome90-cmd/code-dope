@@ -1,0 +1,6 @@
+schema parity exit=0
+baseline positive suite exit=0
+baseline fail-closed gate exit=1 (5 named failures; expected red)
+patched fixture positive suite exit=0
+patched fixture fail-closed gate exit=0
+original policy Git blob remains unchanged

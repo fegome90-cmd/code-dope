@@ -1,0 +1,12 @@
+{
+  "name": "code-dope-selection-research-fixture",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test --test-reporter=tap tests/selection.test.mjs tests/direct.test.mjs",
+    "test:poc": "node --test --test-reporter=tap tests/poc/integration.test.mjs tests/poc/cli.test.mjs tests/poc/lazy-loading.test.mjs",
+    "test:policy-gate": "node --test --test-reporter=tap tests/policy-gate.test.mjs",
+    "test:current-policy-gate": "node --test --test-reporter=tap tests/poc/current-policy-gate.test.mjs",
+    "typecheck": "node ../../node_modules/typescript/bin/tsc -p tsconfig.poc.json"
+  }
+}

@@ -1,7 +1,6 @@
 # Node and generated packages
 node_modules/
 .pnpm-store/
-dist/
 coverage/
 *.tgz
 *.tsbuildinfo
@@ -24,3 +23,9 @@ __pycache__/
 .DS_Store
 .idea/
 .vscode/
+
+# Tooling local y worktrees (los linters no deben recorrerlos)
+.atl/
+.husky/_
+.worktrees/
+worktrees/

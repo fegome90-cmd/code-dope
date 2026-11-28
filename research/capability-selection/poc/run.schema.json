@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["mode", "request", "operation"],
+  "properties": {
+    "mode": { "enum": ["off", "on", "auto"] },
+    "request": { "$ref": "urn:code-dope:selection-request" },
+    "operation": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "provider", "tool", "args"],
+          "properties": {
+            "kind": { "const": "call" },
+            "provider": { "type": "string", "minLength": 1, "maxLength": 128 },
+            "tool": { "type": "string", "minLength": 1, "maxLength": 128 },
+            "args": {}
+          }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["kind", "code"],
+          "properties": {
+            "kind": { "const": "program" },
+            "code": { "type": "string", "minLength": 1, "maxLength": 32768 }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,967 @@
+{
+  "schemaVersion": 1,
+  "benchmark": "PooledWorkerExecutor sustained mixed load",
+  "reportOnly": true,
+  "generatedAt": "2026-11-26T12:56:30.002Z",
+  "runtime": {
+    "node": "v24.22.3",
+    "platform": "linux",
+    "arch": "x64",
+    "release": "6.18.57"
+  },
+  "units": {
+    "memory": "bytes",
+    "latency": "milliseconds",
+    "elapsed": "milliseconds",
+    "spawned": "workers"
+  },
+  "status": "completed",
+  "parameters": {
+    "runsPerConfiguration": 5000,
+    "windowRuns": 500,
+    "size": 2,
+    "maxUses": [
+      100,
+      1000
+    ],
+    "timeoutMs": 75,
+    "killGraceMs": 1000,
+    "idleMs": 0,
+    "prewarm": true
+  },
+  "methodology": {
+    "workload": "Repeat 9 OK, one throw, 9 OK, one timeout by submission index; two concurrent indexed loops per window",
+    "targetMix": {
+      "ok": 0.9,
+      "throw": 0.05,
+      "timeout": 0.05
+    },
+    "smoke": false,
+    "smokeMix": "50 runs use the deterministic prefix: 45 OK, 3 throws, 2 timeouts",
+    "percentile": "nearest rank within each window, across all execution kinds",
+    "latency": "Wall time around execute(), including worker readiness and pool overhead; no extra warm-up executions",
+    "memory": "RSS covers the process including workers; heapUsed and heapTotal cover the calling parent thread",
+    "outcomes": "OK/throw/timeout count expected matching results; all other returned results and rejections count as unexpected",
+    "errorSamples": "The first 20 unexpected outcomes per configuration are retained; total and omitted counts remain explicit",
+    "configurationOrder": "Sequential in the same parent process; trends compare the first and last completed windows within each configuration",
+    "recycling": "Errors recycle workers, so this workload may not reach maxUses; it measures sustained mixed-load stability",
+    "alerts": "RSS > 1.5 times or p95 > 2 times the first completed window; alerts and unexpected outcomes do not set a failing exit code"
+  },
+  "configurations": [
+    {
+      "maxUses": 100,
+      "status": "completed",
+      "startedAt": "2026-11-26T12:56:30.002Z",
+      "elapsedMs": 25664.846,
+      "requestedExecutions": 5000,
+      "completedExecutions": 5000,
+      "expectedCounts": {
+        "ok": 4500,
+        "throw": 250,
+        "timeout": 250
+      },
+      "outcomes": {
+        "ok": 4500,
+        "throw": 250,
+        "timeout": 250,
+        "unexpected": 0
+      },
+      "unexpectedErrors": {
+        "count": 0,
+        "samples": [],
+        "omitted": 0
+      },
+      "fatalErrors": [],
+      "poolClosed": true,
+      "memoryBeforeWorkload": {
+        "rssBytes": 94347264,
+        "heapUsedBytes": 26734080,
+        "heapTotalBytes": 36839424
+      },
+      "windows": [
+        {
+          "window": 1,
+          "firstExecution": 1,
+          "lastExecution": 500,
+          "executions": 500,
+          "expectedCounts": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25
+          },
+          "outcomes": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25,
+            "unexpected": 0
+          },
+          "elapsedMs": 2729.649,
+          "latencyMs": {
+            "p50": 1.019,
+            "p95": 76.636,
+            "max": 125.876
+          },
+          "memory": {
+            "rssBytes": 174743552,
+            "heapUsedBytes": 24753152,
+            "heapTotalBytes": 39985152
+          },
+          "spawned": 52,
+          "spawnedSincePreviousWindow": 52
+        },
+        {
+          "window": 2,
+          "firstExecution": 501,
+          "lastExecution": 1000,
+          "executions": 500,
+          "expectedCounts": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25
+          },
+          "outcomes": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25,
+            "unexpected": 0
+          },
+          "elapsedMs": 2519.247,
+          "latencyMs": {
+            "p50": 0.935,
+            "p95": 69.106,
+            "max": 129.674
+          },
+          "memory": {
+            "rssBytes": 176013312,
+            "heapUsedBytes": 23538528,
+            "heapTotalBytes": 39985152
+          },
+          "spawned": 102,
+          "spawnedSincePreviousWindow": 50
+        },
+        {
+          "window": 3,
+          "firstExecution": 1001,
+          "lastExecution": 1500,
+          "executions": 500,
+          "expectedCounts": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25
+          },
+          "outcomes": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25,
+            "unexpected": 0
+          },
+          "elapsedMs": 2675.068,
+          "latencyMs": {
+            "p50": 1.004,
+            "p95": 76.304,
+            "max": 123.003
+          },
+          "memory": {
+            "rssBytes": 180670464,
+            "heapUsedBytes": 27562240,
+            "heapTotalBytes": 39985152
+          },
+          "spawned": 152,
+          "spawnedSincePreviousWindow": 50
+        },
+        {
+          "window": 4,
+          "firstExecution": 1501,
+          "lastExecution": 2000,
+          "executions": 500,
+          "expectedCounts": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25
+          },
+          "outcomes": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25,
+            "unexpected": 0
+          },
+          "elapsedMs": 2648.731,
+          "latencyMs": {
+            "p50": 1.009,
+            "p95": 76.344,
+            "max": 84.528
+          },
+          "memory": {
+            "rssBytes": 181039104,
+            "heapUsedBytes": 24755960,
+            "heapTotalBytes": 56762368
+          },
+          "spawned": 202,
+          "spawnedSincePreviousWindow": 50
+        },
+        {
+          "window": 5,
+          "firstExecution": 2001,
+          "lastExecution": 2500,
+          "executions": 500,
+          "expectedCounts": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25
+          },
+          "outcomes": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25,
+            "unexpected": 0
+          },
+          "elapsedMs": 2590.593,
+          "latencyMs": {
+            "p50": 0.995,
+            "p95": 76.219,
+            "max": 88.141
+          },
+          "memory": {
+            "rssBytes": 184832000,
+            "heapUsedBytes": 28742432,
+            "heapTotalBytes": 56762368
+          },
+          "spawned": 252,
+          "spawnedSincePreviousWindow": 50
+        },
+        {
+          "window": 6,
+          "firstExecution": 2501,
+          "lastExecution": 3000,
+          "executions": 500,
+          "expectedCounts": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25
+          },
+          "outcomes": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25,
+            "unexpected": 0
+          },
+          "elapsedMs": 2498.933,
+          "latencyMs": {
+            "p50": 0.959,
+            "p95": 71.659,
+            "max": 77.376
+          },
+          "memory": {
+            "rssBytes": 194088960,
+            "heapUsedBytes": 32814272,
+            "heapTotalBytes": 56762368
+          },
+          "spawned": 302,
+          "spawnedSincePreviousWindow": 50
+        },
+        {
+          "window": 7,
+          "firstExecution": 3001,
+          "lastExecution": 3500,
+          "executions": 500,
+          "expectedCounts": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25
+          },
+          "outcomes": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25,
+            "unexpected": 0
+          },
+          "elapsedMs": 2509.321,
+          "latencyMs": {
+            "p50": 0.92,
+            "p95": 65.179,
+            "max": 77.388
+          },
+          "memory": {
+            "rssBytes": 196108288,
+            "heapUsedBytes": 25861136,
+            "heapTotalBytes": 56762368
+          },
+          "spawned": 352,
+          "spawnedSincePreviousWindow": 50
+        },
+        {
+          "window": 8,
+          "firstExecution": 3501,
+          "lastExecution": 4000,
+          "executions": 500,
+          "expectedCounts": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25
+          },
+          "outcomes": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25,
+            "unexpected": 0
+          },
+          "elapsedMs": 2483.68,
+          "latencyMs": {
+            "p50": 0.937,
+            "p95": 76.073,
+            "max": 77.975
+          },
+          "memory": {
+            "rssBytes": 195194880,
+            "heapUsedBytes": 29728616,
+            "heapTotalBytes": 56762368
+          },
+          "spawned": 402,
+          "spawnedSincePreviousWindow": 50
+        },
+        {
+          "window": 9,
+          "firstExecution": 4001,
+          "lastExecution": 4500,
+          "executions": 500,
+          "expectedCounts": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25
+          },
+          "outcomes": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25,
+            "unexpected": 0
+          },
+          "elapsedMs": 2497.967,
+          "latencyMs": {
+            "p50": 0.923,
+            "p95": 64.858,
+            "max": 78.043
+          },
+          "memory": {
+            "rssBytes": 196427776,
+            "heapUsedBytes": 33631240,
+            "heapTotalBytes": 56762368
+          },
+          "spawned": 452,
+          "spawnedSincePreviousWindow": 50
+        },
+        {
+          "window": 10,
+          "firstExecution": 4501,
+          "lastExecution": 5000,
+          "executions": 500,
+          "expectedCounts": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25
+          },
+          "outcomes": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25,
+            "unexpected": 0
+          },
+          "elapsedMs": 2503.133,
+          "latencyMs": {
+            "p50": 0.95,
+            "p95": 64.938,
+            "max": 77.724
+          },
+          "memory": {
+            "rssBytes": 202997760,
+            "heapUsedBytes": 28702344,
+            "heapTotalBytes": 58859520
+          },
+          "spawned": 502,
+          "spawnedSincePreviousWindow": 50
+        }
+      ],
+      "trend": {
+        "evaluated": true,
+        "baseline": "first completed window",
+        "final": "last completed window",
+        "reason": null,
+        "finalOverInitial": {
+          "rss": 1.1616895597956027,
+          "latencyP95": 0.8473563338378831
+        },
+        "thresholds": {
+          "rss": 1.5,
+          "latencyP95": 2
+        },
+        "alerts": []
+      }
+    },
+    {
+      "maxUses": 1000,
+      "status": "completed",
+      "startedAt": "2026-11-26T12:56:55.667Z",
+      "elapsedMs": 24901.449,
+      "requestedExecutions": 5000,
+      "completedExecutions": 5000,
+      "expectedCounts": {
+        "ok": 4500,
+        "throw": 250,
+        "timeout": 250
+      },
+      "outcomes": {
+        "ok": 4500,
+        "throw": 250,
+        "timeout": 250,
+        "unexpected": 0
+      },
+      "unexpectedErrors": {
+        "count": 0,
+        "samples": [],
+        "omitted": 0
+      },
+      "fatalErrors": [],
+      "poolClosed": true,
+      "memoryBeforeWorkload": {
+        "rssBytes": 185102336,
+        "heapUsedBytes": 28740640,
+        "heapTotalBytes": 58859520
+      },
+      "windows": [
+        {
+          "window": 1,
+          "firstExecution": 1,
+          "lastExecution": 500,
+          "executions": 500,
+          "expectedCounts": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25
+          },
+          "outcomes": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25,
+            "unexpected": 0
+          },
+          "elapsedMs": 2492.159,
+          "latencyMs": {
+            "p50": 0.896,
+            "p95": 67.474,
+            "max": 77.302
+          },
+          "memory": {
+            "rssBytes": 205574144,
+            "heapUsedBytes": 32698928,
+            "heapTotalBytes": 59121664
+          },
+          "spawned": 52,
+          "spawnedSincePreviousWindow": 52
+        },
+        {
+          "window": 2,
+          "firstExecution": 501,
+          "lastExecution": 1000,
+          "executions": 500,
+          "expectedCounts": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25
+          },
+          "outcomes": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25,
+            "unexpected": 0
+          },
+          "elapsedMs": 2500.875,
+          "latencyMs": {
+            "p50": 0.912,
+            "p95": 76.2,
+            "max": 77.951
+          },
+          "memory": {
+            "rssBytes": 204419072,
+            "heapUsedBytes": 36500664,
+            "heapTotalBytes": 59121664
+          },
+          "spawned": 102,
+          "spawnedSincePreviousWindow": 50
+        },
+        {
+          "window": 3,
+          "firstExecution": 1001,
+          "lastExecution": 1500,
+          "executions": 500,
+          "expectedCounts": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25
+          },
+          "outcomes": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25,
+            "unexpected": 0
+          },
+          "elapsedMs": 2520.648,
+          "latencyMs": {
+            "p50": 0.933,
+            "p95": 62.212,
+            "max": 77.303
+          },
+          "memory": {
+            "rssBytes": 205545472,
+            "heapUsedBytes": 31196616,
+            "heapTotalBytes": 60956672
+          },
+          "spawned": 152,
+          "spawnedSincePreviousWindow": 50
+        },
+        {
+          "window": 4,
+          "firstExecution": 1501,
+          "lastExecution": 2000,
+          "executions": 500,
+          "expectedCounts": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25
+          },
+          "outcomes": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25,
+            "unexpected": 0
+          },
+          "elapsedMs": 2492.153,
+          "latencyMs": {
+            "p50": 0.915,
+            "p95": 65.83,
+            "max": 78.125
+          },
+          "memory": {
+            "rssBytes": 205221888,
+            "heapUsedBytes": 35019184,
+            "heapTotalBytes": 60956672
+          },
+          "spawned": 202,
+          "spawnedSincePreviousWindow": 50
+        },
+        {
+          "window": 5,
+          "firstExecution": 2001,
+          "lastExecution": 2500,
+          "executions": 500,
+          "expectedCounts": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25
+          },
+          "outcomes": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25,
+            "unexpected": 0
+          },
+          "elapsedMs": 2511.661,
+          "latencyMs": {
+            "p50": 0.961,
+            "p95": 69.534,
+            "max": 78.066
+          },
+          "memory": {
+            "rssBytes": 205365248,
+            "heapUsedBytes": 38811576,
+            "heapTotalBytes": 60956672
+          },
+          "spawned": 252,
+          "spawnedSincePreviousWindow": 50
+        },
+        {
+          "window": 6,
+          "firstExecution": 2501,
+          "lastExecution": 3000,
+          "executions": 500,
+          "expectedCounts": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25
+          },
+          "outcomes": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25,
+            "unexpected": 0
+          },
+          "elapsedMs": 2472.62,
+          "latencyMs": {
+            "p50": 0.946,
+            "p95": 67.099,
+            "max": 77.28
+          },
+          "memory": {
+            "rssBytes": 208228352,
+            "heapUsedBytes": 33558944,
+            "heapTotalBytes": 63315968
+          },
+          "spawned": 302,
+          "spawnedSincePreviousWindow": 50
+        },
+        {
+          "window": 7,
+          "firstExecution": 3001,
+          "lastExecution": 3500,
+          "executions": 500,
+          "expectedCounts": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25
+          },
+          "outcomes": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25,
+            "unexpected": 0
+          },
+          "elapsedMs": 2488.287,
+          "latencyMs": {
+            "p50": 0.889,
+            "p95": 64.08,
+            "max": 78.459
+          },
+          "memory": {
+            "rssBytes": 210317312,
+            "heapUsedBytes": 37298352,
+            "heapTotalBytes": 63315968
+          },
+          "spawned": 352,
+          "spawnedSincePreviousWindow": 50
+        },
+        {
+          "window": 8,
+          "firstExecution": 3501,
+          "lastExecution": 4000,
+          "executions": 500,
+          "expectedCounts": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25
+          },
+          "outcomes": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25,
+            "unexpected": 0
+          },
+          "elapsedMs": 2462.689,
+          "latencyMs": {
+            "p50": 0.901,
+            "p95": 76.152,
+            "max": 129.706
+          },
+          "memory": {
+            "rssBytes": 210391040,
+            "heapUsedBytes": 41039784,
+            "heapTotalBytes": 63315968
+          },
+          "spawned": 402,
+          "spawnedSincePreviousWindow": 50
+        },
+        {
+          "window": 9,
+          "firstExecution": 4001,
+          "lastExecution": 4500,
+          "executions": 500,
+          "expectedCounts": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25
+          },
+          "outcomes": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25,
+            "unexpected": 0
+          },
+          "elapsedMs": 2479.435,
+          "latencyMs": {
+            "p50": 0.899,
+            "p95": 72.916,
+            "max": 135.717
+          },
+          "memory": {
+            "rssBytes": 209858560,
+            "heapUsedBytes": 23427512,
+            "heapTotalBytes": 96083968
+          },
+          "spawned": 452,
+          "spawnedSincePreviousWindow": 50
+        },
+        {
+          "window": 10,
+          "firstExecution": 4501,
+          "lastExecution": 5000,
+          "executions": 500,
+          "expectedCounts": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25
+          },
+          "outcomes": {
+            "ok": 450,
+            "throw": 25,
+            "timeout": 25,
+            "unexpected": 0
+          },
+          "elapsedMs": 2475.286,
+          "latencyMs": {
+            "p50": 0.942,
+            "p95": 75.986,
+            "max": 81.525
+          },
+          "memory": {
+            "rssBytes": 210403328,
+            "heapUsedBytes": 27090192,
+            "heapTotalBytes": 96083968
+          },
+          "spawned": 502,
+          "spawnedSincePreviousWindow": 50
+        }
+      ],
+      "trend": {
+        "evaluated": true,
+        "baseline": "first completed window",
+        "final": "last completed window",
+        "reason": null,
+        "finalOverInitial": {
+          "rss": 1.0234912032517085,
+          "latencyP95": 1.1261522956990841
+        },
+        "thresholds": {
+          "rss": 1.5,
+          "latencyP95": 2
+        },
+        "alerts": []
+      }
+    }
+  ],
+  "executionHistory": {
+    "measuredRevision": "a71272c4d10637c1f7beedcbe984e3e882cb4e8a",
+    "initialFullAttempt": {
+      "status": "crashed",
+      "requestedExecutionsPerConfiguration": 5000,
+      "requestedMaxUses": [
+        100,
+        1000
+      ],
+      "observedShellExitCode": 139,
+      "shellDiagnostic": "Segmentation fault",
+      "stdoutBytes": 0,
+      "stderrBytes": 0,
+      "completedExecutions": null,
+      "confirmedCompletedWindows": 0,
+      "poolClosed": null,
+      "trendEvaluated": false
+    },
+    "boundedComparison": {
+      "runsPerConfiguration": 500,
+      "results": [
+        {
+          "label": "before-m4",
+          "revision": "ca196b8806ddce8f627e843790f0d010cf38fa1b",
+          "exitCode": 0,
+          "elapsedSeconds": 5.432,
+          "configurations": [
+            {
+              "maxUses": 100,
+              "completedExecutions": 500,
+              "outcomes": {
+                "ok": 450,
+                "throw": 25,
+                "timeout": 25,
+                "unexpected": 0
+              },
+              "poolClosed": true,
+              "windows": [
+                {
+                  "window": 1,
+                  "firstExecution": 1,
+                  "lastExecution": 500,
+                  "executions": 500,
+                  "expectedCounts": {
+                    "ok": 450,
+                    "throw": 25,
+                    "timeout": 25
+                  },
+                  "outcomes": {
+                    "ok": 450,
+                    "throw": 25,
+                    "timeout": 25,
+                    "unexpected": 0
+                  },
+                  "elapsedMs": 2657.196,
+                  "latencyMs": {
+                    "p50": 0.98,
+                    "p95": 76.191,
+                    "max": 113.709
+                  },
+                  "memory": {
+                    "rssBytes": 175157248,
+                    "heapUsedBytes": 24669240,
+                    "heapTotalBytes": 40509440
+                  },
+                  "spawned": 51,
+                  "spawnedSincePreviousWindow": 51
+                }
+              ]
+            },
+            {
+              "maxUses": 1000,
+              "completedExecutions": 500,
+              "outcomes": {
+                "ok": 450,
+                "throw": 25,
+                "timeout": 25,
+                "unexpected": 0
+              },
+              "poolClosed": true,
+              "windows": [
+                {
+                  "window": 1,
+                  "firstExecution": 1,
+                  "lastExecution": 500,
+                  "executions": 500,
+                  "expectedCounts": {
+                    "ok": 450,
+                    "throw": 25,
+                    "timeout": 25
+                  },
+                  "outcomes": {
+                    "ok": 450,
+                    "throw": 25,
+                    "timeout": 25,
+                    "unexpected": 0
+                  },
+                  "elapsedMs": 2496.034,
+                  "latencyMs": {
+                    "p50": 0.892,
+                    "p95": 65.728,
+                    "max": 77.344
+                  },
+                  "memory": {
+                    "rssBytes": 175443968,
+                    "heapUsedBytes": 23484392,
+                    "heapTotalBytes": 40509440
+                  },
+                  "spawned": 51,
+                  "spawnedSincePreviousWindow": 51
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "label": "candidate",
+          "revision": "a71272c4d10637c1f7beedcbe984e3e882cb4e8a",
+          "exitCode": 0,
+          "elapsedSeconds": 5.317,
+          "configurations": [
+            {
+              "maxUses": 100,
+              "completedExecutions": 500,
+              "outcomes": {
+                "ok": 450,
+                "throw": 25,
+                "timeout": 25,
+                "unexpected": 0
+              },
+              "poolClosed": true,
+              "windows": [
+                {
+                  "window": 1,
+                  "firstExecution": 1,
+                  "lastExecution": 500,
+                  "executions": 500,
+                  "expectedCounts": {
+                    "ok": 450,
+                    "throw": 25,
+                    "timeout": 25
+                  },
+                  "outcomes": {
+                    "ok": 450,
+                    "throw": 25,
+                    "timeout": 25,
+                    "unexpected": 0
+                  },
+                  "elapsedMs": 2543.33,
+                  "latencyMs": {
+                    "p50": 0.936,
+                    "p95": 71.428,
+                    "max": 131.833
+                  },
+                  "memory": {
+                    "rssBytes": 171659264,
+                    "heapUsedBytes": 24770000,
+                    "heapTotalBytes": 40509440
+                  },
+                  "spawned": 52,
+                  "spawnedSincePreviousWindow": 52
+                }
+              ]
+            },
+            {
+              "maxUses": 1000,
+              "completedExecutions": 500,
+              "outcomes": {
+                "ok": 450,
+                "throw": 25,
+                "timeout": 25,
+                "unexpected": 0
+              },
+              "poolClosed": true,
+              "windows": [
+                {
+                  "window": 1,
+                  "firstExecution": 1,
+                  "lastExecution": 500,
+                  "executions": 500,
+                  "expectedCounts": {
+                    "ok": 450,
+                    "throw": 25,
+                    "timeout": 25
+                  },
+                  "outcomes": {
+                    "ok": 450,
+                    "throw": 25,
+                    "timeout": 25,
+                    "unexpected": 0
+                  },
+                  "elapsedMs": 2617.484,
+                  "latencyMs": {
+                    "p50": 0.984,
+                    "p95": 76.399,
+                    "max": 78.028
+                  },
+                  "memory": {
+                    "rssBytes": 173985792,
+                    "heapUsedBytes": 23626088,
+                    "heapTotalBytes": 40509440
+                  },
+                  "spawned": 52,
+                  "spawnedSincePreviousWindow": 52
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "completedRetry": {
+      "exitCode": 0,
+      "elapsedSeconds": 50.871,
+      "report": "The configurations and windows above are the complete retry output."
+    },
+    "interpretation": "The complete retry met the requested workload. The initial native crash remains unexplained; neither the successful retry nor the 500-run comparisons establish its cause or prove sustained-load stability.",
+    "diagnosticChange": "A configuration-start message was added on stderr before the complete retry; workload and pool implementation were unchanged."
+  }
+}
