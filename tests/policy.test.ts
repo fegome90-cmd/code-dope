@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { z } from "zod";
 import { QuickJSExecutor, withPolicy, createAuditLog, createCodeRunner, type ToolPolicy } from "../src/index.ts";
+import { guardFns, type ArgValidator } from "../src/policy.ts";
 
 const writes: unknown[] = [];
 const fns = {
@@ -170,4 +171,35 @@ test("argument validation fails closed on falsy and empty failure values", async
   assert.equal((await ex.execute("async () => codemode.fn_undef()", counted)).result, "ok-undef");
   assert.equal((await ex.execute("async () => codemode.sp_ok()", counted)).result, "ok-sp");
   assert.equal(calls, 3);
+});
+
+test("safeParse rejects malformed results without running the tool", async () => {
+  for (const result of [{ success: "ok" }, {}, null, { success: false, error: { message: 42 } }]) {
+    let calls = 0;
+    const audit = createAuditLog();
+    // A JavaScript adapter can return values outside the TypeScript contract.
+    const validate = { safeParse: () => result } as unknown as ArgValidator;
+    const guarded = guardFns("fixture", { read: async () => ++calls }, {
+      read: ["read"],
+      validate: { read: validate },
+      audit: audit.sink,
+    });
+    await assert.rejects(guarded.read!({}), /invalid arguments: invalid arguments$/);
+    assert.equal(calls, 0);
+    assert.deepEqual(audit.records.map(({ decision, reason }) => [decision, reason]), [
+      ["denied", "invalid arguments: invalid arguments"],
+    ]);
+  }
+});
+
+test("safeParse preserves valid boolean outcomes", async () => {
+  const guarded = guardFns("fixture", { read: async () => "ok", blocked: async () => "unexpected" }, {
+    read: ["read", "blocked"],
+    validate: {
+      read: { safeParse: () => ({ success: true }) },
+      blocked: { safeParse: () => ({ success: false, error: { message: "custom validation message" } }) },
+    },
+  });
+  assert.equal(await guarded.read!({}), "ok");
+  await assert.rejects(guarded.blocked!({}), /invalid arguments: custom validation message$/);
 });
