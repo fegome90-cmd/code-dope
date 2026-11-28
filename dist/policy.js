@@ -87,9 +87,15 @@ function runValidator(v, args) {
         return "invalid arguments";
     }
     const r = v.safeParse(args);
-    if (r.success)
+    if (typeof r !== "object" || r === null)
+        return "invalid arguments";
+    const { success } = r;
+    if (success === true)
         return undefined;
-    return r.error?.message ? r.error.message : "invalid arguments";
+    if (success !== false)
+        return "invalid arguments";
+    const message = r.error?.message;
+    return typeof message === "string" && message.length > 0 ? message : "invalid arguments";
 }
 function size(v) {
     try {

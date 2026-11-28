@@ -1,0 +1,114 @@
+{
+  "date": "2026-11-27",
+  "baseline": "9ea7c8e66e0b8ca7a566c7a43b1801c3e0298759",
+  "method": {
+    "source": "google/elephant-goldfish-model",
+    "commit": "46933754e63c0424daa9c270d7e0734245d79560",
+    "scope": "EGM adversarial diff review using actual native subagents with fresh conversation contexts",
+    "fullEval": false,
+    "filesystemIsolation": false,
+    "modelDiversityClaimed": false
+  },
+  "initialReview": {
+    "reviewer": "goldfish_review",
+    "scope": "Complete candidate diff: 28 files against baseline",
+    "manifestSha256": "e64f14545503a6d8493c157294fec3834bf10c92e3d94f739499c27a8257ab9f",
+    "findings": [
+      {
+        "severity": "P1",
+        "issue": "Rereading host.native after an in-flight write lost result and audit if the adapter was removed, or attributed verification to a replacement adapter.",
+        "reproducerExitBeforeFix": 1,
+        "resolution": "Capture the invoked adapter and its verification before loading; preserve that metadata in the executor result. Add a regression for removal and replacement after the write starts.",
+        "reproducerExitAfterFix": 0,
+        "state": "RESOLVED"
+      }
+    ]
+  },
+  "focusedRecheck": {
+    "reviewer": "goldfish_fix_review",
+    "scope": "Corrected client and integration test against the original reviewed snapshot; remaining code unchanged",
+    "result": "LGTM",
+    "unresolvedMaterialFindings": 0,
+    "commands": [
+      {
+        "command": "node <scratch>/goldfish/native-revocation.mjs",
+        "exitCode": 0,
+        "observed": {
+          "writes": 1,
+          "saved": true,
+          "ok": true,
+          "audit": "done",
+          "nativeVerification": "NOT_VERIFIED"
+        }
+      },
+      {
+        "command": "sh research/capability-selection/verify.sh",
+        "exitCode": 0,
+        "pocTests": {
+          "pass": 30,
+          "fail": 0
+        },
+        "baselineTests": {
+          "pass": 55,
+          "fail": 0
+        },
+        "schemaComparisons": 220,
+        "typechecks": 2,
+        "baselinePolicy": {
+          "pass": 0,
+          "fail": 5,
+          "exitCode": 1
+        },
+        "currentPolicy": {
+          "pass": 0,
+          "fail": 5,
+          "exitCode": 1
+        },
+        "temporaryPatchedPolicy": {
+          "positivePass": 55,
+          "regressionPass": 5
+        }
+      }
+    ]
+  },
+  "reviewedFinalFileSha256": {
+    "research/capability-selection/poc/client.ts": "e7e007e1fc24fe651c8aff1d3535b16bc5262b5f932f7cc5524fbc626a81ebba",
+    "research/capability-selection/tests/poc/integration.test.mjs": "f178493caf314604272741d5dd220849c5885c0fd7efd01a5c97d77d92d74d90"
+  },
+  "repositoryGate": {
+    "command": "npm run test:all",
+    "exitCode": 0,
+    "javascriptTests": 177,
+    "pythonTests": 5,
+    "infrastructureTests": 5,
+    "packageConsumerTests": 1,
+    "typecheck": "PASS",
+    "distributionDrift": "PASS",
+    "protectedFilesUnchanged": true,
+    "additionalChecks": [
+      {
+        "command": "bash scripts/check-secrets.sh staged",
+        "scanner": "gitleaks 8.30.1",
+        "exitCode": 0,
+        "status": "PASS"
+      },
+      {
+        "command": "node scripts/check-docs.mjs",
+        "documents": 24,
+        "exitCode": 0,
+        "status": "PASS"
+      },
+      {
+        "command": "git diff --cached --check",
+        "exitCode": 0,
+        "status": "PASS"
+      }
+    ]
+  },
+  "limitations": [
+    "The review is evidence from this session, not a security certification.",
+    "Five known current-core validation defects remain FAIL.",
+    "Native host execution remains NOT_VERIFIED.",
+    "Raw logs and the independent scratch reproducer are not committed because they include local machine paths; the permanent integration regression covers both cases."
+  ]
+}

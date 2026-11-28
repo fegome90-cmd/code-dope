@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "strict": true, "noEmit": true, "skipLibCheck": false,
+    "target": "ES2022", "module": "NodeNext", "moduleResolution": "NodeNext",
+    "allowImportingTsExtensions": true,
+    "paths": {"@cloudflare/codemode": ["./fixtures/upstream/executor-types.ts"]},
+    "types": ["node"]
+  },
+  "files": ["fixtures/baseline/direct.ts", "fixtures/baseline/policy.ts", "fixtures/baseline/vendor/cf-utils.ts"]
+}

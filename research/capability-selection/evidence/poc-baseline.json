@@ -1,0 +1,159 @@
+{
+  "date": "2026-11-27",
+  "pr": "https://github.com/fegome90-cmd/code-dope/pull/13",
+  "head": "9ea7c8e66e0b8ca7a566c7a43b1801c3e0298759",
+  "branch": "feat/capability-selection-research",
+  "base": "developer",
+  "baseSha": "0bd8cbc8ed278ad93ac7f5d69c0ccc4cf932b71a",
+  "draft": true,
+  "initialWorktree": "isolated clean clone",
+  "runtime": {
+    "node": "24.22.3",
+    "npm": "11.19.1",
+    "typescript": "5.9.3",
+    "jsonschema": "4.26.0"
+  },
+  "installation": {
+    "command": "npm ci",
+    "exitCode": 0,
+    "lockfileChanged": false
+  },
+  "ci": {
+    "runId": 45991966419,
+    "jobs": [
+      {
+        "id": 140481746059,
+        "name": "package",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 140481746346,
+        "name": "package-windows",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 140481746423,
+        "name": "Secrets and private paths",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "id": 140481746491,
+        "name": "Documentation links and references",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "ruleset": {
+    "id": 28158227,
+    "enforcement": "active",
+    "bypassActors": [],
+    "conditions": {
+      "ref_name": {
+        "exclude": [],
+        "include": [
+          "refs/heads/developer",
+          "refs/heads/tester",
+          "~DEFAULT_BRANCH"
+        ]
+      }
+    },
+    "rules": [
+      {
+        "type": "deletion"
+      },
+      {
+        "type": "non_fast_forward"
+      },
+      {
+        "type": "pull_request",
+        "parameters": {
+          "required_approving_review_count": 0,
+          "dismiss_stale_reviews_on_push": false,
+          "required_reviewers": [],
+          "require_code_owner_review": false,
+          "require_last_push_approval": false,
+          "required_review_thread_resolution": true,
+          "require_extra_approval_for_unattributed_changes": true,
+          "allowed_merge_methods": [
+            "merge",
+            "squash",
+            "rebase"
+          ]
+        }
+      },
+      {
+        "type": "required_status_checks",
+        "parameters": {
+          "strict_required_status_checks_policy": true,
+          "do_not_enforce_on_create": false,
+          "required_status_checks": [
+            {
+              "context": "package",
+              "integration_id": 15368
+            },
+            {
+              "context": "Secrets and private paths",
+              "integration_id": 15368
+            },
+            {
+              "context": "Documentation links and references",
+              "integration_id": 15368
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "reviewThreads": 0,
+  "automatedReview": "CodeRabbit skipped draft",
+  "v3": {
+    "originalVerifyExit": 1,
+    "originalVerifyFailure": "Node 24 default reporter output did not match TAP-only checks",
+    "reproducedWith": "explicit --test-reporter=tap on the unchanged tests in a disposable copy",
+    "positiveTests": {
+      "passed": 55,
+      "failed": 0,
+      "exitCode": 0
+    },
+    "schemaParity": {
+      "cases": 220,
+      "accepted": 15,
+      "rejected": 205,
+      "mismatches": 0,
+      "exitCode": 0
+    },
+    "policyOriginal": {
+      "passed": 0,
+      "failed": 5,
+      "exitCode": 1
+    },
+    "patchedCopy": {
+      "positivePassed": 55,
+      "policyPassed": 5,
+      "exitCode": 0
+    },
+    "originalPolicyUnchanged": true
+  },
+  "repositoryGate": {
+    "command": "npm run test:all",
+    "exitCode": 0,
+    "nodeTests": 177,
+    "pythonTests": 5,
+    "infrastructureTests": 5,
+    "packageTests": 1,
+    "typecheck": "PASS",
+    "distributionDrift": "PASS",
+    "windows": "CI only; no local Windows run"
+  },
+  "protectedFileSha256": {
+    "tests/review-regressions.test.ts": "34d875d18ab40966d0c562824d84e2ea81917dd83375fc1fa2e4eb6a6ea542e9",
+    "tests/executor.test.ts": "9942acb0434c4de6a901396d5121b49db006bc37097a1268d3e77d3f3c30cd0e",
+    "tests/pool-contract.test.ts": "d6a01b67eea02e752f86e1117af2bdc1d49c8a5c159cf94c3f832e5f9c047d15",
+    "package-lock.json": "952d6ac47524ad6175c7113c202cc2d22d11d2adb1190a0b900ec17fbd3e2a21"
+  },
+  "policyGitBlob": "016d9f46c72d30284148f602261b275d8d18e933"
+}

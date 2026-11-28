@@ -1,0 +1,5 @@
+{
+  "mode": "off",
+  "request": { "schemaVersion": 1, "route": "direct" },
+  "operation": { "kind": "call", "provider": "math", "tool": "sum", "args": { "values": [5, -2, 10] } }
+}
